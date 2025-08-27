@@ -1,9 +1,39 @@
 import { useState } from 'react';
-import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/auth/login/', { // <-- use your local IP here
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username:email, password }),
+      });
+
+      const data = await response.json();
+      setLoading(false);
+
+      if (response.ok) {
+        Alert.alert('Success', 'You are logged in!');
+        console.log('Login success:', data);
+      } else {
+        Alert.alert('Error', data.message || 'Login failed');
+        console.log('Login failed:', data);
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Network error:', error);
+      Alert.alert('Error', 'Network error. Make sure your server is running and accessible.');
+    }
+  };
 
   return (
     <View className="flex-1 items-center justify-center p-6 bg-gray-100">
@@ -47,22 +77,25 @@ const LoginScreen = () => {
           </View>
           <View>
             <Text className="text-gray-600 mb-1">Password</Text>
-            <View className="relative">
-              <TextInput
-                className="w-full px-4 py-3 rounded-xl border border-gray-300"
-                placeholder="Enter your password"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-              {/* Eye icon would go here */}
-            </View>
+            <TextInput
+              className="w-full px-4 py-3 rounded-xl border border-gray-300"
+              placeholder="Enter your password"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
           </View>
         </View>
 
         {/* Login Button */}
-        <TouchableOpacity className="w-full bg-purple-700 py-4 rounded-xl mt-6">
-          <Text className="text-white text-center font-bold">Login</Text>
+        <TouchableOpacity
+          className="w-full bg-purple-700 py-4 rounded-xl mt-6"
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text className="text-white text-center font-bold">
+            {loading ? 'Logging in...' : 'Login'}
+          </Text>
         </TouchableOpacity>
 
         {/* Terms of Service */}
