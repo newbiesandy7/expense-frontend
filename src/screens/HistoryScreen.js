@@ -1,331 +1,119 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Text, TextInput, TouchableOpacity, View, ActivityIndicator, Alert, ScrollView, RefreshControl } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useContext, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Header from '../components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import { ThemeContext } from '../context/ThemeContext';
+
 const HistoryScreen = () => {
+    const { colors, isDarkMode } = useContext(ThemeContext);
+    const [isLoading, setIsLoading] = useState(true);
     const [transactions, setTransactions] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedFilter, setSelectedFilter] = useState('All');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [hasNextPage, setHasNextPage] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
 
-    // Fetch categories for filter options
-    const fetchCategories = async () => {
+    const fetchTransactions = async () => {
+        setIsLoading(true);
+        setError(null);
+        // Replace with your actual Django backend URL
+        const transactionsUrl = 'http://YOUR_LOCAL_IP:8000/api/transactions/';
+        
         try {
-            const token = await AsyncStorage.getItem('access_token');
-            if (!token) {
-                Alert.alert('Error', 'You must be logged in to access categories.');
-                return;
-            }
-
-            const response = await fetch('http://127.0.0.1:8000/categories/', {
-                method: 'GET',
+            const accessToken = await AsyncStorage.getItem('access_token');
+            const response = await fetch(transactionsUrl, {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
             });
-            
-            if (response.ok) {
-                const data = await response.json();
-                setCategories(data.results || data || []);
-            }
-        } catch (error) {
-            console.error('Error fetching categories:', error);
-        }
-    };
-
-    // Build query parameters
-    const buildQueryParams = (page = 1, categoryId = null, search = '') => {
-        const params = new URLSearchParams();
-        params.append('page', page.toString());
-        
-        if (categoryId) {
-            params.append('category', categoryId.toString());
-        }
-        
-        if (search.trim()) {
-            params.append('search', search.trim());
-        }
-        
-        return params.toString();
-    };
-
-    // Fetch expenses from API with filters
-    const fetchTransactions = async (page = 1, categoryId = null, search = '', append = false) => {
-        try {
-            if (!append) setLoading(page === 1);
-            if (append) setLoadingMore(true);
-
-            const token = await AsyncStorage.getItem('access_token');
-            if (!token) {
-                Alert.alert('Error', 'You must be logged in to access transactions.');
-                return;
-            }
-
-            const queryParams = buildQueryParams(page, categoryId, search);
-            const url = `http://127.0.0.1:8000/expense/?${queryParams}`;
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-            
-            if (!response.ok) {
-                if (response.status === 401) {
-                    throw new Error('Authentication failed. Please login again.');
-                }
-                throw new Error('Failed to fetch expenses');
-            }
-            
             const data = await response.json();
-            
-            if (append) {
-                setTransactions(prev => [...prev, ...(data.results || [])]);
+
+            if (response.ok) {
+                setTransactions(data);
             } else {
-                setTransactions(data.results || []);
+                setError('Failed to fetch transactions.');
+                console.error('API Error:', data.detail || data);
             }
-            
-            setHasNextPage(!!data.next);
-            setCurrentPage(page);
-            
-        } catch (error) {
-            console.error('Error fetching expenses:', error);
-            Alert.alert('Error', error.message || 'Failed to fetch expenses. Please try again.');
+        } catch (err) {
+            setError('Network error. Could not connect to the server.');
+            console.error('Network Error:', err);
         } finally {
-            setLoading(false);
-            setLoadingMore(false);
-            setRefreshing(false);
+            setIsLoading(false);
         }
     };
 
-    // Initial load
     useEffect(() => {
-        fetchCategories();
         fetchTransactions();
     }, []);
 
-    // Handle filter change
-    const handleFilterChange = (filter) => {
-        setSelectedFilter(filter);
-        setCurrentPage(1);
-        
-        const categoryId = filter === 'All' ? null : categories.find(cat => cat.name === filter)?.id;
-        fetchTransactions(1, categoryId, searchQuery);
-    };
-
-    // Handle search
-    const handleSearch = useCallback((text) => {
-        setSearchQuery(text);
-        setCurrentPage(1);
-        
-        const categoryId = selectedFilter === 'All' ? null : categories.find(cat => cat.name === selectedFilter)?.id;
-        fetchTransactions(1, categoryId, text);
-    }, [selectedFilter, categories]);
-
-    // Load more data (pagination)
-    const loadMore = () => {
-        if (hasNextPage && !loadingMore) {
-            const nextPage = currentPage + 1;
-            const categoryId = selectedFilter === 'All' ? null : categories.find(cat => cat.name === selectedFilter)?.id;
-            fetchTransactions(nextPage, categoryId, searchQuery, true);
-        }
-    };
-
-    // Refresh data
-    const onRefresh = () => {
-        setRefreshing(true);
-        setCurrentPage(1);
-        const categoryId = selectedFilter === 'All' ? null : categories.find(cat => cat.name === selectedFilter)?.id;
-        fetchTransactions(1, categoryId, searchQuery);
-    };
-
-    // Format date to readable format
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        const day = date.getDate();
-        const month = date.toLocaleString('default', { month: 'short' });
-        const year = date.getFullYear();
-        
-        const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
-                      day === 2 || day === 22 ? 'nd' :
-                      day === 3 || day === 23 ? 'rd' : 'th';
-        
-        return `${day}${suffix} ${month}, ${year}`;
-    };
-
-    // Format amount with currency and negative sign
-    const formatAmount = (amount) => {
-        const numAmount = parseFloat(amount);
-        return `-रू${numAmount.toFixed(0)}`;
-    };
-
-    // Calculate total expenses
-    const calculateTotal = () => {
-        return transactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    };
-
-    // Get filter options
-    const getFilterOptions = () => {
-        return ['All', ...categories.map(cat => cat.name)];
-    };
-
-    if (loading && transactions.length === 0) {
-        return (
-            <View className="flex-1 bg-gray-100">
-                <Header
-                    title="Expense History"
-                    subtitle="Check all your expenses here"
-                />
-                <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color="#6D28D9" />
-                    <Text className="mt-2 text-gray-600">Loading expenses...</Text>
+    const renderTransactionItem = ({ item }) => (
+        <View className={`${colors.card} p-4 rounded-xl mb-3 flex-row items-center justify-between shadow-sm`}>
+            <View className="flex-row items-center">
+                <View className={`w-10 h-10 rounded-full justify-center items-center mr-3`} style={{ backgroundColor: item.color || colors.primary }}>
+                    <MaterialCommunityIcons name={item.icon || 'cash'} size={24} color="#FFFFFF" />
+                </View>
+                <View>
+                    <Text className={`text-base font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {item.description || 'No Description'}
+                    </Text>
+                    <Text className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {new Date(item.created_at).toDateString()}
+                    </Text>
                 </View>
             </View>
-        );
-    }
+            <Text className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <Text className="text-red-500">- </Text>रू{item.amount}
+            </Text>
+        </View>
+    );
+
+    const filteredTransactions = transactions.filter(item => 
+        item.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
-        <View className="flex-1 bg-gray-100">
-            <Header
-                title="Expense History"
-                subtitle="Check all your expenses here"
-            />
-            
-            <ScrollView 
-                className="flex-1"
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-                onMomentumScrollEnd={(event) => {
-                    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-                    const paddingToBottom = 20;
-                    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-                        loadMore();
-                    }
-                }}
-            >
-                <View className="p-4">
-                    {/* Search Bar */}
-                    <View className="flex-row items-center rounded-xl p-3 mt-4 bg-white shadow-sm">
-                        <MaterialCommunityIcons name="magnify" size={24} color="#9CA3AF" />
-                        <TextInput 
-                            className="flex-1 ml-2" 
-                            placeholder="Search expenses..." 
-                            value={searchQuery}
-                            onChangeText={handleSearch}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => handleSearch('')}>
-                                <MaterialCommunityIcons name="close" size={20} color="#9CA3AF" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {/* Total Expenses */}
-                    <View className="p-4 bg-white rounded-xl shadow-sm mt-4 mb-4">
-                        <Text className="text-gray-500 text-center">
-                            {selectedFilter === 'All' ? 'Total Expenses' : `Total ${selectedFilter} Expenses`}
-                        </Text>
-                        <Text className="text-red-600 font-bold text-xl text-center mt-1">
-                            रू{calculateTotal().toFixed(0)}
-                        </Text>
-                        <Text className="text-gray-400 text-sm text-center mt-1">
-                            {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
-                        </Text>
-                    </View>
-
-                    {/* Filter Buttons */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                        <View className="flex-row space-x-2">
-                            {getFilterOptions().map((filter) => (
-                                <TouchableOpacity 
-                                    key={filter} 
-                                    className={`px-4 py-2 rounded-full border ${
-                                        selectedFilter === filter 
-                                            ? 'border-purple-500 bg-purple-500' 
-                                            : 'border-gray-300 bg-white'
-                                    }`}
-                                    onPress={() => handleFilterChange(filter)}
-                                >
-                                    <Text className={`text-sm font-medium ${
-                                        selectedFilter === filter ? 'text-white' : 'text-gray-700'
-                                    }`}>
-                                        {filter}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </ScrollView>
-
-                    {/* Section Title */}
-                    <Text className="text-lg font-bold text-gray-700 mb-3">
-                        {selectedFilter === 'All' ? 'All Expenses' : `${selectedFilter} Expenses`}
-                    </Text>
-                    
-                    {/* Transactions List */}
-                    {transactions.length === 0 ? (
-                        <View className="flex-1 justify-center items-center mt-12 mb-12">
-                            <MaterialCommunityIcons name="receipt-text-outline" size={64} color="#9CA3AF" />
-                            <Text className="text-gray-500 mt-4 text-lg">No expenses found</Text>
-                            <Text className="text-gray-400 mt-1 text-center">
-                                {searchQuery ? 'Try adjusting your search or filters' : 'Start adding your expenses'}
-                            </Text>
-                        </View>
-                    ) : (
-                        <>
-                            {transactions.map((item) => (
-                                <TouchableOpacity 
-                                    key={item.id} 
-                                    className="flex-row items-center p-4 mb-3 bg-white rounded-2xl shadow-sm active:bg-gray-50"
-                                >
-                                    <View className="w-12 h-12 rounded-full justify-center items-center bg-purple-100 mr-4">
-                                        <MaterialCommunityIcons 
-                                            name={item.category.icon || 'help-circle'} 
-                                            size={24} 
-                                            color="#6D28D9" 
-                                        />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-lg font-bold text-gray-800 mb-1">
-                                            {item.description}
-                                        </Text>
-                                        <Text className="text-sm text-gray-500">
-                                            {item.category.name} • {formatDate(item.date)}
-                                        </Text>
-                                    </View>
-                                    <Text className="text-lg font-bold text-red-600">
-                                        {formatAmount(item.amount)}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                            
-                            {/* Load More Indicator */}
-                            {loadingMore && (
-                                <View className="py-4 justify-center items-center">
-                                    <ActivityIndicator size="small" color="#6D28D9" />
-                                    <Text className="text-gray-500 mt-2 text-sm">Loading more...</Text>
-                                </View>
-                            )}
-                            
-                            {/* End of Results */}
-                            {!hasNextPage && transactions.length > 0 && (
-                                <View className="py-6 justify-center items-center">
-                                    <Text className="text-gray-400 text-sm">You've reached the end</Text>
-                                </View>
-                            )}
-                        </>
-                    )}
+        <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            <Header title="Transaction History" showBackButton={false} />
+            <View className="p-6">
+                {/* Search Bar */}
+                <View className={`flex-row items-center rounded-full p-2 mb-6 ${isDarkMode ? 'bg-gray-700' : 'bg-white'} shadow-sm`}>
+                    <MaterialCommunityIcons name="magnify" size={24} color={isDarkMode ? '#D1D5DB' : '#6B7280'} />
+                    <TextInput
+                        className={`flex-1 ml-2 text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
+                        placeholder="Search transactions..."
+                        placeholderTextColor={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
                 </View>
-            </ScrollView>
+                
+                {isLoading ? (
+                    <View className="flex-1 justify-center items-center">
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text className={`mt-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Loading transactions...</Text>
+                    </View>
+                ) : error ? (
+                    <View className="flex-1 justify-center items-center">
+                        <Text className="text-red-500 text-base">{error}</Text>
+                        <TouchableOpacity onPress={fetchTransactions} className="mt-4 px-4 py-2 rounded-full bg-purple-500">
+                            <Text className="text-white font-semibold">Retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredTransactions}
+                        renderItem={renderTransactionItem}
+                        keyExtractor={item => item.id.toString()}
+                        showsVerticalScrollIndicator={false}
+                        ListEmptyComponent={() => (
+                            <View className="flex-1 items-center justify-center mt-20">
+                                <MaterialCommunityIcons name="format-list-bulleted-square" size={64} color={isDarkMode ? colors.subtext : colors.subtext} />
+                                <Text className={`mt-4 text-center text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>No transactions found.</Text>
+                            </View>
+                        )}
+                    />
+                )}
+            </View>
         </View>
     );
 };

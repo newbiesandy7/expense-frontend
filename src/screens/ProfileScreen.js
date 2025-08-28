@@ -1,133 +1,71 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useContext } from 'react';
-import { ScrollView, Switch, Text, View, TouchableOpacity, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Header from '../components/Header';
+import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 
-const ProfileScreen = ({ navigation }) => {
-    const user = {
-        name: 'Alex Johnson',
-        email: 'alex.johnson@email.com',
-        netWorth: 'रू48,766',
-        daysStreak: 45,
-        totalTransactions: 234,
-        categoriesUsed: 12,
-        groupsJoined: 3,
-        daysActive: 45,
-    };
+const getInitial = (name) => {
+    if (!name) return '';
+    return name.charAt(0).toUpperCase();
+};
 
-    const { isDarkMode, toggleTheme } = useContext(ThemeContext);
+const ProfileScreen = () => {
+    const { isDarkMode, colors } = useContext(ThemeContext);
+    const { userName, userEmail, logout } = useContext(AuthContext);
 
     const containerStyle = isDarkMode ? 'bg-gray-800' : 'bg-gray-100';
     const cardBgColor = isDarkMode ? 'bg-gray-700' : 'bg-white';
     const textStyle = isDarkMode ? 'text-white' : 'text-gray-900';
-    const subtextColor = isDarkMode ? 'text-gray-400' : 'text-gray-600';
-    const iconColor = isDarkMode ? 'yellow' : 'gray';
-
-    // Logout function
-    const handleLogout = async () => {
-  if (typeof window !== 'undefined') {
-    const confirmLogout = window.confirm('Are you sure you want to logout?');
-    if (!confirmLogout) return;
-
-    await AsyncStorage.removeItem('access_token');
-    await AsyncStorage.removeItem('refresh_token');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Profile' }], // or 'Login'
-    });
-  } else {
-    // Native behavior for mobile
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await AsyncStorage.removeItem('access_token');
-          await AsyncStorage.removeItem('refresh_token');
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Profile' }],
-          });
-        },
-      },
-    ]);
-  }
-};
+    const subtextStyle = isDarkMode ? 'text-gray-400' : 'text-gray-600';
 
     return (
         <ScrollView className={`flex-1 ${containerStyle}`}>
-            <Header
-                title="Profile"
-                subtitle="Your personal dashboard"
-                showProfileIcon={false}
-                showBackButton={true}
-            />
+            <Header title="Profile" showBackButton={true} showProfileIcon={false} />
             <View className="p-6">
-                {/* User Info */}
-                <View className={`${cardBgColor} rounded-3xl p-6 mb-6 shadow-md items-center`}>
-                    <View className="w-24 h-24 rounded-full bg-purple-200 justify-center items-center mb-4">
-                        <Text className="text-4xl font-bold text-purple-700">A</Text>
+                {/* Profile Card */}
+                <View className={`${cardBgColor} p-6 rounded-3xl shadow-sm items-center mb-6`}>
+                    <View className="w-24 h-24 rounded-full bg-purple-700 justify-center items-center mb-4">
+                        <Text className="text-white text-4xl font-bold">{getInitial(userName)}</Text>
                     </View>
-                    <Text className={`text-2xl font-bold ${textStyle}`}>{user.name}</Text>
-                    <Text className={`text-sm ${subtextColor}`}>{user.email}</Text>
-                    <View className="bg-yellow-400 rounded-full px-3 py-1 mt-2">
-                        <Text className="text-xs font-bold text-white">Premium Member</Text>
-                    </View>
+                    <Text className={`text-2xl font-bold ${textStyle}`}>{userName}</Text>
+                    <Text className={`text-sm ${subtextStyle}`}>{userEmail}</Text>
                 </View>
 
-                {/* Activity Cards */}
-                <View className="flex-row justify-between mb-6">
-                    <View className={`flex-1 p-4 rounded-3xl ${cardBgColor} mr-2 shadow-sm items-center`}>
-                        <Text className="text-2xl font-bold text-purple-700">{user.netWorth}</Text>
-                        <Text className="text-sm text-gray-500 mt-1">Net Worth</Text>
-                    </View>
-                    <View className={`flex-1 p-4 rounded-3xl ${cardBgColor} ml-2 shadow-sm items-center`}>
-                        <Text className="text-2xl font-bold text-purple-700">{user.daysStreak}</Text>
-                        <Text className="text-sm text-gray-500 mt-1">Days Streak</Text>
-                    </View>
+                {/* Account Settings Section */}
+                <View className={`${cardBgColor} rounded-3xl p-6 shadow-sm mb-6`}>
+                    <Text className={`text-xl font-bold ${textStyle} mb-4`}>Account Settings</Text>
+                    
+                    <TouchableOpacity className="flex-row items-center p-3 rounded-lg mb-2">
+                        <MaterialCommunityIcons name="account-edit-outline" size={24} color={colors.subtext} />
+                        <Text className={`ml-3 text-lg ${textStyle}`}>Edit Profile</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity className="flex-row items-center p-3 rounded-lg mb-2">
+                        <MaterialCommunityIcons name="lock-reset" size={24} color={colors.subtext} />
+                        <Text className={`ml-3 text-lg ${textStyle}`}>Change Password</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity className="flex-row items-center p-3 rounded-lg">
+                        <MaterialCommunityIcons name="bell-ring-outline" size={24} color={colors.subtext} />
+                        <Text className={`ml-3 text-lg ${textStyle}`}>Notifications</Text>
+                    </TouchableOpacity>
                 </View>
 
-                {/* Appearance */}
-                <Text className={`text-lg font-bold ${textStyle} mb-4`}>Appearance</Text>
-                <View className={`flex-row justify-between items-center p-4 rounded-xl ${cardBgColor} shadow-sm mb-6`}>
-                    <View className="flex-row items-center">
-                        <MaterialCommunityIcons name="lightbulb" size={24} color={iconColor} />
-                        <Text className={`text-lg font-medium ml-4 ${textStyle}`}>Light mode</Text>
-                    </View>
-                    <Switch value={isDarkMode} onValueChange={toggleTheme} trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }} thumbColor={isDarkMode ? "#F9FAFB" : "#F3F4F6"} />
-                </View>
+                {/* Actions Section */}
+                <View className={`${cardBgColor} rounded-3xl p-6 shadow-sm`}>
+                    <Text className={`text-xl font-bold ${textStyle} mb-4`}>Actions</Text>
+                    
+                    <TouchableOpacity className="flex-row items-center p-3 rounded-lg mb-2">
+                        <MaterialCommunityIcons name="chart-box-outline" size={24} color={colors.subtext} />
+                        <Text className={`ml-3 text-lg ${textStyle}`}>Export Data</Text>
+                    </TouchableOpacity>
 
-                {/* Your Activity */}
-                <Text className={`text-lg font-bold ${textStyle} mb-4`}>Your Activity</Text>
-                <View className="flex-row flex-wrap justify-between">
-                    <View className={`w-[48%] p-4 ${cardBgColor} rounded-2xl shadow-sm mb-4 items-center`}>
-                        <Text className="text-lg font-bold text-purple-700">{user.totalTransactions}</Text>
-                        <Text className="text-sm text-gray-500 mt-1 text-center">Total Transactions</Text>
-                    </View>
-                    <View className={`w-[48%] p-4 ${cardBgColor} rounded-2xl shadow-sm mb-4 items-center`}>
-                        <Text className="text-lg font-bold text-purple-700">{user.categoriesUsed}</Text>
-                        <Text className="text-sm text-gray-500 mt-1 text-center">Categories Used</Text>
-                    </View>
-                    <View className={`w-[48%] p-4 ${cardBgColor} rounded-2xl shadow-sm mb-4 items-center`}>
-                        <Text className="text-lg font-bold text-purple-700">{user.groupsJoined}</Text>
-                        <Text className="text-sm text-gray-500 mt-1 text-center">Groups Joined</Text>
-                    </View>
-                    <View className={`w-[48%] p-4 ${cardBgColor} rounded-2xl shadow-sm mb-4 items-center`}>
-                        <Text className="text-lg font-bold text-purple-700">{user.daysActive}</Text>
-                        <Text className="text-sm text-gray-500 mt-1 text-center">Days Active</Text>
-                    </View>
+                    <TouchableOpacity onPress={logout} className="flex-row items-center p-3 rounded-lg">
+                        <MaterialCommunityIcons name="logout" size={24} color="red" />
+                        <Text className="ml-3 text-lg text-red-500 font-semibold">Log Out</Text>
+                    </TouchableOpacity>
                 </View>
-
-                {/* Logout Button */}
-                <TouchableOpacity
-                    className="w-full bg-red-500 py-4 rounded-xl mt-6"
-                    onPress={handleLogout}
-                >
-                    <Text className="text-white text-center font-bold">Logout</Text>
-                </TouchableOpacity>
             </View>
         </ScrollView>
     );

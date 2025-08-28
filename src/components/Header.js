@@ -1,28 +1,34 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useContext } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { ThemeContext } from '../context/ThemeContext';
 
-const Header = ({ title, subtitle, showProfileIcon = true, showBackButton = false }) => {
+const getInitial = (name) => {
+    if (!name) return '';
+    return name.charAt(0).toUpperCase();
+};
+
+const Header = ({ title, subtitle, showProfileIcon = true, showBackButton = false, userName }) => {
     const navigation = useNavigation();
+    const { isDarkMode, colors } = useContext(ThemeContext);
 
     return (
-        <View className="px-6 pt-12 pb-4 bg-white shadow-sm flex-row items-center justify-between">
-            <View className="flex-row items-center">
-                {showBackButton && (
-                    <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
-                        <MaterialCommunityIcons name="arrow-left" size={24} color="#6D28D9" />
-                    </TouchableOpacity>
-                )}
-                <View>
-                    <Text className="text-3xl font-bold text-purple-700">{title}</Text>
-                    {subtitle && <Text className="text-gray-500 mt-1">{subtitle}</Text>}
-                </View>
+        <View className="flex-row items-center justify-between p-6">
+            <View>
+                {subtitle && <Text className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{subtitle}</Text>}
+                <Text className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{title}</Text>
             </View>
+
+            {showBackButton && (
+                <TouchableOpacity onPress={() => navigation.goBack()} className="p-2">
+                    <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? 'white' : 'black'} />
+                </TouchableOpacity>
+            )}
+
             {showProfileIcon && (
-                <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-                    <View className="w-12 h-12 rounded-full bg-purple-200 justify-center items-center">
-                        <Text className="text-xl font-bold text-purple-700">A</Text>
-                    </View>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile')} className="w-10 h-10 rounded-full bg-purple-700 justify-center items-center">
+                    <Text className="text-white text-lg font-bold">{getInitial(userName)}</Text>
                 </TouchableOpacity>
             )}
         </View>

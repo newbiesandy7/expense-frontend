@@ -1,102 +1,121 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { FlatList, Linking, Text, TouchableOpacity, View } from 'react-native';
+import { useContext, useEffect, useState } from 'react';
+import { ActivityIndicator, LayoutAnimation, Linking, Platform, ScrollView, Text, TouchableOpacity, UIManager, View } from 'react-native';
 import Header from '../components/Header';
+import { ThemeContext } from '../context/ThemeContext';
+import { learnContent } from '../data/learnContent'; // Import the new data file
 
-const financialContent = [
-    {
-        id: '1',
-        type: 'Video',
-        title: 'How to Budget Like a Pro',
-        source: 'The Financial Diet',
-        duration: '10 min',
-        url: 'https://www.youtube.com/watch?v=zYKJdzyAviE',
-        icon: 'youtube',
-    },
-    {
-        id: '2',
-        type: 'Video',
-        title: 'Building Your Investment Portfolio',
-        source: 'The Money Guy Show',
-        duration: '15 min',
-        url: 'https://www.youtube.com/watch?v=wz3Ea74_p9k',
-        icon: 'youtube',
-    },
-    {
-        id: '3',
-        type: 'Blog Post',
-        title: 'The 50/30/20 Budget Rule Explained',
-        source: 'NerdWallet Blog',
-        duration: '6 min read',
-        url: 'https://www.nerdwallet.com/article/finance/how-to-build-a-budget',
-        icon: 'file-document',
-    },
-    {
-        id: '4',
-        type: 'Video',
-        title: 'Understanding Compound Interest',
-        source: 'Khan Academy',
-        duration: '8 min',
-        url: 'https://www.youtube.com/watch?v=5_9W68OjJkY',
-        icon: 'youtube',
-    },
-    {
-        id: '5',
-        type: 'Blog Post',
-        title: 'Smart Ways to Save Money Daily',
-        source: 'Investopedia',
-        duration: '5 min read',
-        url: 'https://www.investopedia.com/articles/pf/08/everyday-money-saving-tips.asp',
-        icon: 'file-document',
-    },
-];
+if (
+    Platform.OS === 'android' &&
+    UIManager.setLayoutAnimationEnabledExperimental
+) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const LearnScreen = () => {
-    const handlePress = (url) => {
-        if (url) {
-            Linking.openURL(url);
-        }
+    const { colors, isDarkMode } = useContext(ThemeContext);
+    const [expandedFAQ, setExpandedFAQ] = useState(null);
+    const [content, setContent] = useState({ blogs: [], videos: [], faqs: [] });
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        // Simulate an API call with a delay
+        const fetchContent = () => {
+            setTimeout(() => {
+                setContent(learnContent);
+                setIsLoading(false);
+            }, 1000); // 1-second delay
+        };
+
+        fetchContent();
+    }, []);
+
+    const toggleFAQ = (id) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpandedFAQ(expandedFAQ === id ? null : id);
     };
 
-    const renderItem = ({ item }) => (
-        <TouchableOpacity
-            onPress={() => handlePress(item.url)}
-            className="p-4 mb-3 bg-white rounded-2xl shadow-sm flex-row items-center"
-        >
-            <MaterialCommunityIcons
-                name={item.icon}
-                size={24}
-                color={item.source.includes('YouTube') || item.source.includes('Khan Academy') ? 'red' : '#6D28D9'}
-            />
-            <View className="ml-4 flex-1">
-                <Text className="text-lg font-bold text-gray-800">{item.title}</Text>
-                <Text className="text-gray-500 mt-1">{item.source} • {item.duration}</Text>
+    const handlePressLink = (url) => {
+        Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+    };
+
+    const containerStyle = isDarkMode ? 'bg-gray-800' : 'bg-gray-100';
+    const cardBgColor = isDarkMode ? 'bg-gray-700' : 'bg-white';
+    const textStyle = isDarkMode ? 'text-white' : 'text-gray-900';
+    const subtextStyle = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+
+    if (isLoading) {
+        return (
+            <View className={`flex-1 justify-center items-center ${containerStyle}`}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text className={`mt-4 text-lg ${textStyle}`}>Loading content...</Text>
             </View>
-            <MaterialCommunityIcons name="arrow-right-circle" size={24} color="#6D28D9" />
-        </TouchableOpacity>
-    );
+        );
+    }
 
     return (
-        <View className="flex-1 bg-gray-100">
-            <Header
-                title="Financial Literacy"
-                subtitle="Expand your financial knowledge"
-            />
-            <FlatList
-                data={financialContent}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{ padding: 16 }}
-                ListHeaderComponent={
-                    <View className="p-6 mb-6 bg-white rounded-2xl shadow-sm">
-                        <Text className="text-lg font-bold text-gray-700">Learning Progress</Text>
-                        <Text className="text-sm text-gray-500">You've completed 2 of 5 topics</Text>
-                        <View className="w-full h-2 rounded-full bg-gray-200 mt-4">
-                            <View className="w-2/5 h-2 rounded-full bg-purple-700" />
+        <ScrollView className={`flex-1 ${containerStyle}`}>
+            <Header title="Financial Literacy" showBackButton={false} />
+            <View className="p-6">
+                {/* Financial Blogs Section */}
+                <Text className={`text-xl font-bold ${textStyle} mb-4`}>Financial Health Blogs</Text>
+                {content.blogs.map(blog => (
+                    <TouchableOpacity
+                        key={blog.id}
+                        className={`${cardBgColor} p-4 rounded-xl mb-4 shadow-sm flex-row items-center`}
+                        onPress={() => handlePressLink(blog.link)}
+                    >
+                        <MaterialCommunityIcons name={blog.icon} size={32} color={colors.primary} />
+                        <View className="ml-4 flex-1">
+                            <Text className={`text-lg font-semibold ${textStyle}`}>{blog.title}</Text>
+                            <Text className={`text-sm ${subtextStyle}`}>{blog.summary}</Text>
                         </View>
+                    </TouchableOpacity>
+                ))}
+
+                {/* Videos Section */}
+                <View className="h-6" />
+                <Text className={`text-xl font-bold ${textStyle} mb-4`}>Videos to Watch</Text>
+                {content.videos.map(video => (
+                    <TouchableOpacity
+                        key={video.id}
+                        className={`${cardBgColor} p-4 rounded-xl mb-4 shadow-sm flex-row items-center`}
+                        onPress={() => handlePressLink(video.link)}
+                    >
+                        <MaterialCommunityIcons name={video.icon} size={32} color="#FF0000" />
+                        <View className="ml-4 flex-1">
+                            <Text className={`text-lg font-semibold ${textStyle}`}>{video.title}</Text>
+                        </View>
+                    </TouchableOpacity>
+                ))}
+
+                {/* FAQ Section */}
+                <View className="h-6" />
+                <Text className={`text-xl font-bold ${textStyle} mb-4`}>FAQs about Finance</Text>
+                {content.faqs.map(faq => (
+                    <View key={faq.id} className={`${cardBgColor} p-4 rounded-xl mb-4 shadow-sm`}>
+                        <TouchableOpacity
+                            onPress={() => toggleFAQ(faq.id)}
+                            className="flex-row justify-between items-center"
+                        >
+                            <Text className={`text-lg font-semibold flex-1 ${textStyle}`}>
+                                {faq.question}
+                            </Text>
+                            <MaterialCommunityIcons
+                                name={expandedFAQ === faq.id ? 'chevron-up' : 'chevron-down'}
+                                size={24}
+                                color={colors.subtext}
+                            />
+                        </TouchableOpacity>
+                        {expandedFAQ === faq.id && (
+                            <Text className={`mt-2 ${subtextStyle}`}>
+                                {faq.answer}
+                            </Text>
+                        )}
                     </View>
-                }
-            />
-        </View>
+                ))}
+            </View>
+        </ScrollView>
     );
 };
 

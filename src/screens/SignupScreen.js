@@ -1,10 +1,12 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useContext, useState } from 'react';
+import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ThemeContext } from '../context/ThemeContext';
 
 const SignupScreen = () => {
     const navigation = useNavigation();
+    const { colors, isDarkMode } = useContext(ThemeContext);
+
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -15,8 +17,13 @@ const SignupScreen = () => {
         setIsLoading(true);
         setError(null);
 
-        // Replace with your actual Django backend URL for user registration
-        const signupUrl = 'http://127.0.0.1:8000/api/auth/register/';
+        const signupUrl = 'http://127.0.0.1:8000/api/auth/register/'; // Use your Django registration URL
+
+        if (!name || !email || !password) {
+            setError('Please fill in all fields.');
+            setIsLoading(false);
+            return;
+        }
 
         try {
             const response = await fetch(signupUrl, {
@@ -24,26 +31,25 @@ const SignupScreen = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    name: name,
-                    email: email,
-                    password: password,
-                }),
+                body: JSON.stringify({ name, email, password }),
             });
 
             const data = await response.json();
+            setIsLoading(false);
 
             if (response.ok) {
                 console.log('Signup successful:', data);
-                // After successful signup, navigate to the login page
-                navigation.navigate('Login');
+                Alert.alert(
+                    "Success",
+                    "Your account has been created successfully! Please log in.",
+                    [{ text: "OK", onPress: () => navigation.navigate('Login') }]
+                );
             } else {
-                // Signup failed, show errors from the backend
                 let errorMessage = 'Signup failed. Please check your information.';
                 if (data.email) {
-                    errorMessage = data.email[0]; // Example: "user with this email already exists."
+                    errorMessage = data.email[0];
                 } else if (data.password) {
-                    errorMessage = data.password[0]; // Example: "This password is too short."
+                    errorMessage = data.password[0];
                 } else if (data.detail) {
                     errorMessage = data.detail;
                 }
@@ -51,87 +57,80 @@ const SignupScreen = () => {
             }
         } catch (err) {
             console.error('Network error:', err);
-            setError('Failed to connect to the server. Please check your network.');
-        } finally {
             setIsLoading(false);
+            setError('Failed to connect to the server. Please check your network.');
         }
     };
 
-    return (
-        <View className="flex-1 justify-center items-center bg-gray-100 p-6">
-            <Text className="text-4xl font-bold text-purple-700 mb-2">Sign Up</Text>
-            <Text className="text-gray-500 mb-6">Create a new account</Text>
+    const containerBg = isDarkMode ? 'bg-gray-800' : 'bg-gray-100';
+    const cardBg = isDarkMode ? 'bg-gray-700' : 'bg-white';
+    const inputBg = isDarkMode ? 'bg-gray-600' : 'bg-gray-200';
+    const textStyle = isDarkMode ? 'text-white' : 'text-gray-900';
+    const placeholderColor = isDarkMode ? '#9CA3AF' : '#6B7280';
 
-            {/* Full Name Input */}
-            <View className="w-full mb-4">
-                <View className="flex-row items-center bg-white p-3 rounded-lg shadow-sm">
-                    <MaterialCommunityIcons name="account" size={20} color="#6B7280" />
+    return (
+        <View className={`flex-1 items-center justify-center p-6 ${containerBg}`}>
+            <View className={`${cardBg} p-8 rounded-3xl shadow-lg w-full max-w-sm`}>
+                <Text className={`text-3xl font-bold text-center mb-2 ${textStyle}`}>Create Account</Text>
+                <Text className={`text-sm text-center mb-6 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sign up to start your financial journey</Text>
+
+                {/* Form Inputs */}
+                <View className="space-y-4">
                     <TextInput
-                        className="flex-1 ml-3 text-lg text-gray-800"
+                        className={`w-full h-12 rounded-xl px-4 ${inputBg} ${textStyle}`}
                         placeholder="Full Name"
+                        placeholderTextColor={placeholderColor}
                         value={name}
                         onChangeText={setName}
                     />
-                </View>
-            </View>
-
-            {/* Email Input */}
-            <View className="w-full mb-4">
-                <View className="flex-row items-center bg-white p-3 rounded-lg shadow-sm">
-                    <MaterialCommunityIcons name="email" size={20} color="#6B7280" />
                     <TextInput
-                        className="flex-1 ml-3 text-lg text-gray-800"
+                        className={`w-full h-12 rounded-xl px-4 ${inputBg} ${textStyle}`}
                         placeholder="Email Address"
+                        placeholderTextColor={placeholderColor}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         value={email}
                         onChangeText={setEmail}
                     />
-                </View>
-            </View>
-
-            {/* Password Input */}
-            <View className="w-full mb-6">
-                <View className="flex-row items-center bg-white p-3 rounded-lg shadow-sm">
-                    <MaterialCommunityIcons name="lock" size={20} color="#6B7280" />
                     <TextInput
-                        className="flex-1 ml-3 text-lg text-gray-800"
+                        className={`w-full h-12 rounded-xl px-4 ${inputBg} ${textStyle}`}
                         placeholder="Password"
+                        placeholderTextColor={placeholderColor}
                         secureTextEntry
                         value={password}
                         onChangeText={setPassword}
                     />
                 </View>
-            </View>
-            
-            {/* Error Message */}
-            {error && (
-                <View className="mb-4 p-3 bg-red-100 rounded-lg w-full">
-                    <Text className="text-red-600 font-medium text-center">{error}</Text>
-                </View>
-            )}
 
-            {/* Signup Button */}
-            <TouchableOpacity
-                onPress={handleSignup}
-                className={`w-full bg-purple-700 px-8 py-3 rounded-full shadow-md items-center mb-4 ${isLoading ? 'opacity-50' : ''}`}
-                disabled={isLoading}
-            >
-                {isLoading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                    <Text className="text-white font-bold text-lg">Sign Up</Text>
+                {error && (
+                    <View className="mt-4 p-3 bg-red-100 rounded-lg w-full">
+                        <Text className="text-red-600 font-medium text-center">{error}</Text>
+                    </View>
                 )}
-            </TouchableOpacity>
 
-            {/* Login Link */}
-            <TouchableOpacity
-                onPress={() => navigation.navigate('Login')}
-            >
-                <Text className="text-sm text-gray-600">
-                    Already have an account? <Text className="font-bold text-purple-700">Log In</Text>
-                </Text>
-            </TouchableOpacity>
+                {/* Signup Button */}
+                <TouchableOpacity
+                    onPress={handleSignup}
+                    className={`w-full bg-purple-700 py-4 rounded-full mt-6 items-center ${isLoading ? 'opacity-50' : ''}`}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                        <Text className="text-white font-bold text-lg">Sign Up</Text>
+                    )}
+                </TouchableOpacity>
+
+                {/* Login Link */}
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('Login')}
+                    className="mt-4"
+                >
+                    <Text className={`text-sm text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Already have an account? <Text className={`font-bold ${isDarkMode ? 'text-purple-400' : 'text-purple-700'}`}>Log In</Text>
+                    </Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
