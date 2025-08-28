@@ -98,7 +98,7 @@ const AddScreen = () => {
                 body: JSON.stringify({
                     amount: parseFloat(amount),
                     description,
-                    category: selectedCategory, // This is now the category ID
+                    category_id: selectedCategory, // This is now the category ID
                     group: isExpense ? 'Expense' : 'Income',
                 }),
             });
