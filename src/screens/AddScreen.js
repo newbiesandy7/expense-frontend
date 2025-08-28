@@ -23,7 +23,7 @@ const AddScreen = () => {
             {/* Income/Expense Toggle */}
             <View className="flex-row rounded-full p-1 bg-gray-200 mb-6">
                 <TouchableOpacity
-                    className={`flex-1 items-center py-2 px-4 rounded-full ${isExpense ? 'bg-white shadow' : ''}`}
+                    className={`flex-1 items-center py-2 px-4 rounded-full ${isExpense ? 'bg-white BoxShadow' : ''}`}
                     onPress={() => setIsExpense(true)}
                 >
                     <Text className={`font-semibold ${isExpense ? 'text-red-500' : 'text-gray-500'}`}>Expense</Text>

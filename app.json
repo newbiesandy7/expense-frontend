@@ -4,7 +4,7 @@
     "slug": "rupaiyaa-new",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/Expense Tracer.png",
     "scheme": "rupaiyaanew",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

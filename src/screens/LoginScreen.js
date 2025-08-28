@@ -4,7 +4,7 @@ import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
+  
   return (
     <View className="flex-1 items-center justify-center p-6 bg-gray-100">
       <View className="bg-white p-8 rounded-3xl shadow-lg w-full max-w-sm">
