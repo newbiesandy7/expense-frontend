@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Image, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const LoginScreen = () => {
+  const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -10,22 +13,48 @@ const LoginScreen = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/auth/login/', { // <-- use your local IP here
+      const response = await fetch('http://127.0.0.1:8000/auth/login/', { // <-- use your local IP if testing on mobile
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username:email, password }),
+        body: JSON.stringify({ username: email, password }),
       });
 
       const data = await response.json();
       setLoading(false);
 
       if (response.ok) {
-        Alert.alert('Success', 'You are logged in!');
-        console.log('Login success:', data);
+        // Save the access token in AsyncStorage
+        await AsyncStorage.setItem('access_token', data.access);
+        // Optionally save refresh token if your backend provides it
+        if (data.refresh) {
+          await AsyncStorage.setItem('refresh_token', data.refresh);
+        }
+
+        Alert.alert(
+          'Success',
+          'You are logged in!',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('Home'), // navigate after user presses OK
+            },
+          ],
+          { cancelable: false }
+        );
+
+  console.log('Login success:', data);
+        navigation.reset({
+  index: 0,
+  routes: [{ name: 'Main', params: { screen: 'Home' } }],
+});
+
+
+        // TODO: navigate to home screen after login
+        // navigation.navigate('Home');
       } else {
-        Alert.alert('Error', data.message || 'Login failed');
+        Alert.alert('Error', data.detail || 'Login failed');
         console.log('Login failed:', data);
       }
     } catch (error) {
