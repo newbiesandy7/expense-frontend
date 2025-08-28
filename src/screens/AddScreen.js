@@ -1,153 +1,207 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useContext, useState } from 'react';
-import { Alert, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useContext, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Header from '../components/Header';
 import { ThemeContext } from '../context/ThemeContext';
 
-const expenseCategories = [
-    { name: 'Food', icon: 'food-fork-drink' },
-    { name: 'Transport', icon: 'bus' },
-    { name: 'Shopping', icon: 'shopping' },
-    { name: 'Bills', icon: 'receipt' },
-    { name: 'Entertainment', icon: 'movie' },
-    { name: 'Health', icon: 'hospital' },
-    { name: 'Groceries', icon: 'cart' },
-    { name: 'Education', icon: 'school' },
-    { name: 'Other', icon: 'dots-horizontal-circle' },
-];
-
-const incomeCategories = [
-    { name: 'Salary', icon: 'cash-multiple' },
-    { name: 'Freelance', icon: 'account-hard-hat' },
-    { name: 'Gift', icon: 'gift' },
-    { name: 'Rental', icon: 'home-city' },
-    { name: 'Investments', icon: 'chart-line' },
-    { name: 'Other', icon: 'dots-horizontal-circle' },
-];
-
 const paymentMethods = [
-    { name: 'eSewa', icon: 'cellphone' },
-    { name: 'Khalti', icon: 'credit-card' },
+    { name: 'Credit Card', icon: 'credit-card-outline' },
+    { name: 'Debit Card', icon: 'credit-card-chip-outline' },
     { name: 'Cash', icon: 'cash' },
-    { name: 'Bank Transfer', icon: 'bank-transfer' },
+    { name: 'UPI', icon: 'qrcode' },
+    { name: 'Bank Transfer', icon: 'bank' },
 ];
 
 const AddScreen = () => {
     const { colors, isDarkMode } = useContext(ThemeContext);
-
-    const [transactionType, setTransactionType] = useState('Expense');
+    const [type, setType] = useState('Expense');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState(null);
-    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [category, setCategory] = useState(null);
+    const [paymentMethod, setPaymentMethod] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [categoriesLoading, setCategoriesLoading] = useState(true);
 
-    const handleSaveTransaction = () => {
-        if (!amount || !selectedCategory) {
-            Alert.alert('Missing Information', 'Please enter an amount and select a category.');
-            return;
+    const [expenseCategories, setExpenseCategories] = useState([]);
+    const [incomeCategories, setIncomeCategories] = useState([]);
+
+    const categories = type === 'Expense' ? expenseCategories : incomeCategories;
+
+    const fetchCategories = async (categoryType) => {
+        try {
+            const accessToken = await AsyncStorage.getItem('access_token');
+            // Corrected URL to use singular 'expense' and 'income'
+            const endpoint = `http://192.168.1.10:8000/${categoryType}/categories/`;
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            const data = await response.json();
+            if (response.ok) {
+                return data; 
+            } else {
+                console.error(`Failed to fetch ${categoryType} categories:`, data);
+                return []; 
+            }
+        } catch (error) {
+            console.error('Network error:', error);
+            return [];
         }
-
-        const transactionData = {
-            type: transactionType,
-            amount: parseFloat(amount),
-            category: selectedCategory,
-            description: description,
-            date: date.toISOString().split('T')[0],
-            paymentMethod: selectedPaymentMethod,
-        };
-        
-        console.log('Saving Transaction:', transactionData);
-        Alert.alert('Success', `${transactionType} of रू${amount} added successfully!`);
-
-        // This is where you would use fetch() to send data to your Django backend.
-        // Example:
-        // fetch('http://YOUR_LOCAL_IP:8000/api/transactions/create/', {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //         'Authorization': `Bearer ${token}` // Add authorization token
-        //     },
-        //     body: JSON.stringify(transactionData),
-        // }).then(response => response.json())
-        //   .then(data => console.log('Backend response:', data))
-        //   .catch(error => console.error('Error saving transaction:', error));
-
-        // Reset the form after saving
-        setAmount('');
-        setDescription('');
-        setSelectedCategory(null);
-        setSelectedPaymentMethod(null);
-        setDate(new Date());
     };
 
-    const onChangeDate = (event, selectedDate) => {
+    useEffect(() => {
+        const loadCategories = async () => {
+            setCategoriesLoading(true);
+            // Calling the fetch function with the correct singular endpoint types
+            const fetchedExpenseCats = await fetchCategories('expense');
+            const fetchedIncomeCats = await fetchCategories('income');
+            setExpenseCategories(fetchedExpenseCats);
+            setIncomeCategories(fetchedIncomeCats);
+            setCategoriesLoading(false);
+        };
+        loadCategories();
+    }, []);
+
+    const onDateChange = (event, selectedDate) => {
         const currentDate = selectedDate || date;
         setShowDatePicker(Platform.OS === 'ios');
         setDate(currentDate);
     };
 
-    const containerStyle = isDarkMode ? 'bg-gray-800' : 'bg-gray-100';
-    const cardBgColor = isDarkMode ? 'bg-gray-700' : 'bg-white';
-    const textStyle = isDarkMode ? 'text-white' : 'text-gray-900';
-    const inputBg = isDarkMode ? 'bg-gray-600' : 'bg-gray-200';
+    const handleSave = async () => {
+        if (!amount || !category || !paymentMethod) {
+            Alert.alert('Incomplete Form', 'Please fill in all required fields.');
+            return;
+        }
 
-    const currentCategories = transactionType === 'Expense' ? expenseCategories : incomeCategories;
-    const saveButtonColor = transactionType === 'Expense' ? 'bg-red-500' : 'bg-green-500';
+        setLoading(true);
+
+        const transactionData = {
+            amount: parseFloat(amount),
+            description: description || 'N/A',
+            date: date.toISOString().split('T')[0],
+            category: category.name,
+            payment_method: paymentMethod.name,
+        };
+
+        let endpoint = '';
+        if (type === 'Expense') {
+            // Corrected URL to use singular 'expense'
+            endpoint = 'http://192.168.1.10:8000/expense/';
+        } else {
+            // Corrected URL to use singular 'income'
+            endpoint = 'http://192.168.1.10:8000/income/';
+        }
+
+        try {
+            const accessToken = await AsyncStorage.getItem('access_token');
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify(transactionData),
+            });
+
+            const responseData = await response.json();
+
+            if (response.ok) {
+                Alert.alert('Success', `${type} added successfully!`);
+                setAmount('');
+                setDescription('');
+                setDate(new Date());
+                setCategory(null);
+                setPaymentMethod(null);
+            } else {
+                Alert.alert('Error', responseData.detail || `Failed to add ${type}.`);
+                console.error('API Error:', responseData);
+            }
+        } catch (error) {
+            Alert.alert('Network Error', 'Could not connect to the server.');
+            console.error('Network Error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <ScrollView className={`flex-1 ${containerStyle}`} showsVerticalScrollIndicator={false}>
-            <Header title={`Add ${transactionType}`} showBackButton={false} />
+        <ScrollView className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            <Header title="Add Transaction" showBackButton={false} showProfileIcon={false} />
             <View className="p-6">
-                {/* Type Selector */}
-                <View className={`flex-row rounded-full p-1 mb-6 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+                {/* Type Selection */}
+                <View className={`rounded-xl p-1 mb-6 flex-row ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                     <TouchableOpacity
-                        onPress={() => setTransactionType('Expense')}
-                        className={`flex-1 items-center py-2 rounded-full ${transactionType === 'Expense' ? 'bg-red-500' : ''}`}
+                        className={`flex-1 py-3 rounded-lg items-center ${type === 'Expense' && (isDarkMode ? 'bg-gray-600' : 'bg-white shadow')}`}
+                        onPress={() => setType('Expense')}
                     >
-                        <Text className={`font-semibold ${transactionType === 'Expense' ? 'text-white' : colors.subtext}`}>Expense</Text>
+                        <Text className={`font-semibold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Expense</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        onPress={() => setTransactionType('Income')}
-                        className={`flex-1 items-center py-2 rounded-full ${transactionType === 'Income' ? 'bg-green-500' : ''}`}
+                        className={`flex-1 py-3 rounded-lg items-center ${type === 'Income' && (isDarkMode ? 'bg-gray-600' : 'bg-white shadow')}`}
+                        onPress={() => setType('Income')}
                     >
-                        <Text className={`font-semibold ${transactionType === 'Income' ? 'text-white' : colors.subtext}`}>Income</Text>
+                        <Text className={`font-semibold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Income</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Main Inputs */}
-                <View className={`${cardBgColor} p-6 rounded-3xl shadow-sm mb-6`}>
-                    <Text className={`text-xl font-bold ${textStyle} mb-4`}>Transaction Details</Text>
-                    
-                    <Text className={`text-base font-medium ${textStyle} mb-2`}>Amount</Text>
+                {/* Amount Input */}
+                <View className="mb-6">
+                    <Text className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Amount</Text>
                     <TextInput
-                        className={`w-full h-14 rounded-xl px-4 text-xl font-bold mb-4 ${inputBg} ${textStyle}`}
-                        placeholder="Enter amount"
-                        placeholderTextColor={isDarkMode ? '#A78BFA' : '#9CA3AF'}
+                        className={`text-4xl font-bold border-b pb-2 ${isDarkMode ? 'text-white border-gray-600' : 'text-gray-900 border-gray-300'}`}
+                        placeholder="रू0.00"
+                        placeholderTextColor={isDarkMode ? '#6B7280' : '#A0AEC0'}
                         keyboardType="numeric"
                         value={amount}
                         onChangeText={setAmount}
                     />
+                </View>
 
-                    <Text className={`text-base font-medium ${textStyle} mb-2`}>Description</Text>
-                    <TextInput
-                        className={`w-full h-12 rounded-xl px-4 text-lg mb-4 ${inputBg} ${textStyle}`}
-                        placeholder="e.g., Dinner with friends"
-                        placeholderTextColor={isDarkMode ? '#A78BFA' : '#9CA3AF'}
-                        value={description}
-                        onChangeText={setDescription}
-                    />
+                {/* Category Selection */}
+                <View className="mb-6">
+                    <Text className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Category</Text>
+                    {categoriesLoading ? (
+                        <View className="items-center py-4">
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Loading categories...</Text>
+                        </View>
+                    ) : (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            {categories.map((item, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    className={`items-center mr-4 p-3 rounded-xl ${category?.name === item.name ? 'bg-purple-700' : (isDarkMode ? 'bg-gray-700' : 'bg-white')}`}
+                                    onPress={() => setCategory(item)}
+                                >
+                                    <MaterialCommunityIcons
+                                        name={item.icon}
+                                        size={32}
+                                        color={category?.name === item.name ? '#FFF' : colors.primary}
+                                    />
+                                    <Text className={`mt-1 font-semibold text-center ${category?.name === item.name ? 'text-white' : (isDarkMode ? 'text-white' : 'text-gray-900')}`}>
+                                        {item.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
+                </View>
 
-                    <Text className={`text-base font-medium ${textStyle} mb-2`}>Date</Text>
-                    <TouchableOpacity 
-                        onPress={() => setShowDatePicker(true)}
-                        className={`w-full h-12 rounded-xl px-4 mb-4 justify-center ${inputBg}`}
-                    >
-                        <Text className={`text-lg ${textStyle}`}>
-                            {date.toDateString()}
-                        </Text>
+                {/* Other Inputs */}
+                <View className="space-y-4">
+                    <TouchableOpacity onPress={() => setShowDatePicker(true)} className={`flex-row items-center p-4 rounded-xl ${isDarkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                        <MaterialCommunityIcons name="calendar-month-outline" size={24} color={colors.primary} />
+                        <Text className={`ml-3 text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{date.toDateString()}</Text>
                     </TouchableOpacity>
                     {showDatePicker && (
                         <DateTimePicker
@@ -155,74 +209,53 @@ const AddScreen = () => {
                             value={date}
                             mode="date"
                             display="default"
-                            onChange={onChangeDate}
-                            maximumDate={new Date()}
+                            onChange={onDateChange}
                         />
                     )}
+
+                    <TextInput
+                        className={`p-4 rounded-xl text-lg ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+                        placeholder="Description (optional)"
+                        placeholderTextColor={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                        value={description}
+                        onChangeText={setDescription}
+                    />
                 </View>
 
-                {/* Categories Section */}
-                <View className={`${cardBgColor} p-6 rounded-3xl shadow-sm mb-6`}>
-                    <Text className={`text-xl font-bold ${textStyle} mb-4`}>Select a Category</Text>
-                    <View className="flex-row flex-wrap justify-between">
-                        {currentCategories.map((item) => (
+                {/* Payment Method Selection */}
+                <View className="mt-6 mb-6">
+                    <Text className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Payment Method</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {paymentMethods.map((item, index) => (
                             <TouchableOpacity
-                                key={item.name}
-                                onPress={() => setSelectedCategory(item.name)}
-                                className={`w-[30%] p-3 mb-4 rounded-xl items-center ${
-                                    selectedCategory === item.name
-                                        ? isDarkMode ? 'bg-purple-600' : 'bg-purple-200 border-2 border-purple-700'
-                                        : isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
-                                }`}
+                                key={index}
+                                className={`items-center mr-4 p-3 rounded-xl ${paymentMethod?.name === item.name ? 'bg-purple-700' : (isDarkMode ? 'bg-gray-700' : 'bg-white')}`}
+                                onPress={() => setPaymentMethod(item)}
                             >
-                                <MaterialCommunityIcons 
-                                    name={item.icon} 
-                                    size={36} 
-                                    color={selectedCategory === item.name ? colors.primary : colors.subtext}
+                                <MaterialCommunityIcons
+                                    name={item.icon}
+                                    size={32}
+                                    color={paymentMethod?.name === item.name ? '#FFF' : colors.primary}
                                 />
-                                <Text className={`text-xs font-medium mt-2 text-center ${
-                                    selectedCategory === item.name ? 'text-purple-700' : isDarkMode ? 'text-white' : 'text-gray-900'
-                                }`}>
+                                <Text className={`mt-1 font-semibold text-center ${paymentMethod?.name === item.name ? 'text-white' : (isDarkMode ? 'text-white' : 'text-gray-900')}`}>
                                     {item.name}
                                 </Text>
                             </TouchableOpacity>
                         ))}
-                    </View>
+                    </ScrollView>
                 </View>
-
-                {/* Payment Method Section (only for expenses) */}
-                {transactionType === 'Expense' && (
-                    <View className={`${cardBgColor} p-6 rounded-3xl shadow-sm mb-6`}>
-                        <Text className={`text-xl font-bold ${textStyle} mb-4`}>Paid by</Text>
-                        <View className="flex-row flex-wrap justify-between">
-                            {paymentMethods.map((item) => (
-                                <TouchableOpacity
-                                    key={item.name}
-                                    onPress={() => setSelectedPaymentMethod(item.name)}
-                                    className={`w-[48%] p-3 mb-4 rounded-xl items-center flex-row ${
-                                        selectedPaymentMethod === item.name
-                                            ? isDarkMode ? 'bg-purple-600' : 'bg-purple-200 border-2 border-purple-700'
-                                            : isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
-                                    }`}
-                                >
-                                    <MaterialCommunityIcons name={item.icon} size={24} color={selectedPaymentMethod === item.name ? colors.primary : colors.subtext} />
-                                    <Text className={`text-sm font-medium ml-2 ${
-                                        selectedPaymentMethod === item.name ? 'text-purple-700' : isDarkMode ? 'text-white' : 'text-gray-900'
-                                    }`}>
-                                        {item.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
-                )}
 
                 {/* Save Button */}
                 <TouchableOpacity
-                    onPress={handleSaveTransaction}
-                    className={`w-full py-4 rounded-full shadow-md items-center ${saveButtonColor}`}
+                    onPress={handleSave}
+                    className="w-full bg-purple-700 py-4 rounded-full items-center"
+                    disabled={loading}
                 >
-                    <Text className="text-white font-bold text-lg">Save {transactionType}</Text>
+                    {loading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                        <Text className="text-white text-lg font-bold">Add {type}</Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </ScrollView>

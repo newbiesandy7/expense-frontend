@@ -43,7 +43,7 @@ const HomeScreen = () => {
 
     const fetchFinancialData = async () => {
         setIsLoading(true);
-        const dataUrl = 'http://YOUR_LOCAL_IP:8000/api/financial-summary/';
+        const dataUrl = 'http://127.0.0.1:8000/api/expense/report/';
         
         try {
             const accessToken = await AsyncStorage.getItem('access_token');
