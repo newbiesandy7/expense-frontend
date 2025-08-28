@@ -16,7 +16,7 @@ const HistoryScreen = () => {
         setIsLoading(true);
         setError(null);
         // Replace with your actual Django backend URL
-        const transactionsUrl = 'http://127.0.0.1:8000/api/transactions/';
+        const transactionsUrl = 'http://127.0.0.1:8000/expense/transactions/';
         
         try {
             const accessToken = await AsyncStorage.getItem('access_token');
