@@ -1,10 +1,12 @@
+import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const LoginScreen = () => {
+  const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+
   return (
     <View className="flex-1 items-center justify-center p-6 bg-gray-100">
       <View className="bg-white p-8 rounded-3xl shadow-lg w-full max-w-sm">
@@ -47,22 +49,25 @@ const LoginScreen = () => {
           </View>
           <View>
             <Text className="text-gray-600 mb-1">Password</Text>
-            <View className="relative">
-              <TextInput
-                className="w-full px-4 py-3 rounded-xl border border-gray-300"
-                placeholder="Enter your password"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-              {/* Eye icon would go here */}
-            </View>
+            <TextInput
+              className="w-full px-4 py-3 rounded-xl border border-gray-300"
+              placeholder="Enter your password"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
           </View>
         </View>
 
         {/* Login Button */}
-        <TouchableOpacity className="w-full bg-purple-700 py-4 rounded-xl mt-6">
-          <Text className="text-white text-center font-bold">Login</Text>
+        <TouchableOpacity
+          className="w-full bg-purple-700 py-4 rounded-xl mt-6"
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text className="text-white text-center font-bold">
+            {loading ? 'Logging in...' : 'Login'}
+          </Text>
         </TouchableOpacity>
 
         {/* Terms of Service */}
