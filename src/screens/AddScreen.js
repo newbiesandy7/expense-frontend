@@ -1,9 +1,11 @@
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useNavigation } from '@react-navigation/native';
 import { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import CustomHeader from '../components/CustomHeader'; // Import the new header component
+import CustomHeader from '../components/CustomHeader';
 import { ThemeContext } from '../context/ThemeContext';
 
 const paymentMethods = [

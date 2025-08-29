@@ -81,6 +81,8 @@ const HomeScreen = () => {
         labels: [],
         datasets: [{ data: [] }]
     });
+    const [budgets, setBudgets] = useState([]);
+    const [budgetsLoading, setBudgetsLoading] = useState(true);
 
     const fetchDashboardData = async () => {
         setIsLoading(true);
@@ -142,9 +144,34 @@ const HomeScreen = () => {
         }
     };
 
+    // Fetch budgets from API
+    const fetchBudgets = async () => {
+        setBudgetsLoading(true);
+        try {
+            const accessToken = await AsyncStorage.getItem('access_token');
+            const response = await fetch('http://127.0.0.1:8000/budget/budgets/', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = await response.json();
+            if (response.ok && data.results) {
+                setBudgets(data.results);
+            } else {
+                setBudgets([]);
+            }
+        } catch (e) {
+            setBudgets([]);
+        } finally {
+            setBudgetsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (isFocused) {
             fetchDashboardData();
+            fetchBudgets();
         }
     }, [isFocused]);
 
@@ -156,6 +183,50 @@ const HomeScreen = () => {
         </View>
     );
 
+    // Budget Card UI
+    const renderBudgetCard = (item) => {
+        const spent = item.total_expense || 0;
+        const allowed = item.allowed_expense || item.budget || 0;
+        const remaining = (allowed - spent).toFixed(2);
+        const percent = allowed > 0 ? (spent / allowed) * 100 : 0;
+        let status = 'On Track';
+        let statusColor = '#7C3AED';
+        if (percent >= 100) {
+            status = 'Exceeded';
+            statusColor = '#EF4444';
+        } else if (percent >= (item.threshold_percentage || 80)) {
+            status = 'Warning';
+            statusColor = '#F59E42';
+        }
+        return (
+            <View key={item.id} className={`mb-4 p-4 rounded-xl shadow bg-white border border-gray-200`}>
+                <View className="flex-row justify-between items-start mb-2">
+                    <View>
+                        <Text className="font-bold text-base text-gray-800">{item.category?.name || 'All Categories'}</Text>
+                    </View>
+                    <TouchableOpacity>
+                        <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                </View>
+                <View className="flex-row items-center mb-1">
+                    <View style={{ backgroundColor: statusColor, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>{status}</Text>
+                    </View>
+                    <Text className="text-gray-700 text-base font-semibold">रू{spent} / </Text>
+                    <Text className="text-gray-400 text-base font-semibold">रू{allowed}</Text>
+                </View>
+                {/* Progress Bar */}
+                <View className="w-full h-2 bg-gray-200 rounded-full mb-2">
+                    <View style={{ width: `${Math.min(percent, 100)}%`, height: 8, backgroundColor: '#A78BFA', borderRadius: 8 }} />
+                </View>
+                <View className="flex-row justify-between items-center">
+                    <Text className="text-green-600 font-semibold">रू{remaining} remaining</Text>
+                    <Text className="text-gray-500 font-semibold">{percent.toFixed(1)}%</Text>
+                </View>
+            </View>
+        );
+    };
+
     const navigation = useNavigation();
     return (
         <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
@@ -166,16 +237,6 @@ const HomeScreen = () => {
                 showTotalBalance={true}
                 totalBalance={`रू${totalBalance}`}
             />
-
-            {/* Set Budget Goal Button */}
-            <View className="px-6 mt-4">
-                <TouchableOpacity
-                    className="w-full bg-blue-600 py-3 rounded-xl items-center mb-4"
-                    onPress={() => navigation.navigate('SetBudgetGoal')}
-                >
-                    <Text className="text-white font-bold text-lg">Set Budget Goal</Text>
-                </TouchableOpacity>
-            </View>
 
             {isLoading ? (
                 <View className="flex-1 justify-center items-center">
@@ -224,9 +285,7 @@ const HomeScreen = () => {
                             <MaterialCommunityIcons name="chart-bar" size={24} color={isDarkMode ? '#D1D5DB' : '#6B7280'} />
                             <Text className={`text-lg font-semibold ml-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Daily Spending</Text>
                         </View>
-                        {dailySpendingData.datasets[0].data.every(val => val === 0) ? (
-                            <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No daily spending data available</Text>
-                        ) : (
+                        {Array.isArray(dailySpendingData.labels) && Array.isArray(dailySpendingData.datasets) && dailySpendingData.labels.length > 0 && dailySpendingData.datasets[0].data.length > 0 ? (
                             <BarChart
                                 data={dailySpendingData}
                                 width={screenWidth - 48}
@@ -251,7 +310,29 @@ const HomeScreen = () => {
                                     borderRadius: 16
                                 }}
                             />
+                        ) : (
+                            <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No daily spending data available</Text>
                         )}
+                    </View>
+
+                    {/* Set Budget Goal Button & Budget Cards Section (moved here) */}
+                    <View className="mb-4">
+                        <TouchableOpacity
+                            style={{ backgroundColor: colors.accent }}
+                            className="w-full py-3 rounded-xl items-center mb-4"
+                            onPress={() => navigation.navigate('SetBudgetGoal')}
+                        >
+                            <Text className="text-white font-bold text-lg">Set Budget Goal</Text>
+                        </TouchableOpacity>
+                        <View>
+                            {budgetsLoading ? (
+                                <ActivityIndicator size="small" color={colors.primary} />
+                            ) : budgets.length === 0 ? (
+                                <Text className="text-gray-400 text-center">No budgets set for this month.</Text>
+                            ) : (
+                                budgets.map(renderBudgetCard)
+                            )}
+                        </View>
                     </View>
 
                     {/* Expense Breakdown */}
