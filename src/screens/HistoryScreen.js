@@ -26,7 +26,7 @@ const HistoryScreen = () => {
             const accessToken = await AsyncStorage.getItem('access_token');
             const response = await fetch(transactionsUrl, {
                 headers: {
-                    'Authorization': Bearer ${accessToken},
+                    'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
             });
@@ -59,22 +59,22 @@ const HistoryScreen = () => {
         const dateStr = item.dateObj ? item.dateObj.toDateString() : 'Unknown Date';
         const timeStr = item.dateObj ? item.dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
         return (
-            <View className={${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl mb-3 flex-row items-center justify-between shadow-sm}>
+            <View className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl mb-3 flex-row items-center justify-between shadow-sm`}>
                 <View className="flex-row items-center">
                     <View className="w-10 h-10 rounded-full justify-center items-center mr-3" style={{ backgroundColor: item.category_color }}>
                         <MaterialCommunityIcons name={item.icon} size={24} color="#FFFFFF" />
                     </View>
                     <View>
-                        <Text className={text-base font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}}>
+                        <Text className={`text-base font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                             {item.description || 'No Description'}
                         </Text>
-                        <Text className={text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}}>
+                        <Text className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                             {dateStr}{timeStr ? ` at ${timeStr}` : ''}
                         </Text>
                     </View>
                 </View>
                 <View className="items-end">
-                    <Text className={text-lg font-bold ${item.type === 'Income' ? 'text-green-500' : 'text-red-500'}}>
+                    <Text className={`text-lg font-bold ${item.type === 'Income' ? 'text-green-500' : 'text-red-500'}`}>
                         {item.type === 'Expense' ? '-' : '+'} रू{item.amount}
                     </Text>
                     <View className="rounded-full px-2 py-1 mt-1" style={{ backgroundColor: item.category_color }}>
@@ -96,13 +96,13 @@ const HistoryScreen = () => {
     });
 
     return (
-        <View className={flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}}>
+        <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
             <CustomHeader title="Transaction History" showProfileIcon onFilterPress={() => setFilterModalVisible(true)} />
             <View className="px-6 -mt-16 z-10">
-                <View className={flex-row items-center rounded-2xl p-4 ${isDarkMode ? 'bg-gray-900' : 'bg-white'} shadow-sm mb-4}>
+                <View className={`flex-row items-center rounded-2xl p-4 ${isDarkMode ? 'bg-gray-900' : 'bg-white'} shadow-sm mb-4`}>
                     <MaterialCommunityIcons name="magnify" size={24} color={isDarkMode ? '#D1D5DB' : '#6B7280'} />
                     <TextInput
-                        className={flex-1 ml-2 text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}}
+                        className={`flex-1 ml-2 text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
                         placeholder="Search transactions..."
                         placeholderTextColor={isDarkMode ? '#9CA3AF' : '#6B7280'}
                         value={searchQuery}
@@ -114,9 +114,9 @@ const HistoryScreen = () => {
                         <TouchableOpacity
                             key={index}
                             onPress={() => setActiveCategory(filter)}
-                            className={rounded-full px-4 py-2 mr-2 ${activeCategory === filter ? 'bg-purple-700' : (isDarkMode ? 'bg-gray-900' : 'bg-white')}}
+                            className={`rounded-full px-4 py-2 mr-2 ${activeCategory === filter ? 'bg-purple-700' : (isDarkMode ? 'bg-gray-900' : 'bg-white')}`}
                         >
-                            <Text className={font-medium ${activeCategory === filter ? 'text-white' : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}}>{filter}</Text>
+                            <Text className={`font-medium ${activeCategory === filter ? 'text-white' : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>{filter}</Text>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
@@ -125,7 +125,7 @@ const HistoryScreen = () => {
                 {isLoading ? (
                     <View className="flex-1 justify-center items-center">
                         <ActivityIndicator size="large" color={colors.primary} />
-                        <Text className={mt-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}}>Loading transactions...</Text>
+                        <Text className={`mt-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Loading transactions...</Text>
                     </View>
                 ) : error ? (
                     <View className="flex-1 justify-center items-center">
@@ -143,7 +143,7 @@ const HistoryScreen = () => {
                         ListEmptyComponent={() => (
                             <View className="flex-1 items-center justify-center mt-20">
                                 <MaterialCommunityIcons name="cash-remove" size={64} color={isDarkMode ? colors.subtext : colors.subtext} />
-                                <Text className={mt-4 text-center text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}}>No transactions found.</Text>
+                                <Text className={`mt-4 text-center text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>No transactions found.</Text>
                             </View>
                         )}
                     />
