@@ -12,7 +12,7 @@ const getInitial = (name) => {
 
 const ProfileScreen = () => {
     const { isDarkMode, colors } = useContext(ThemeContext);
-    const { userName, userEmail, logout } = useContext(AuthContext);
+    const { userName, userEmail, profileImage, logout } = useContext(AuthContext);
 
     const containerStyle = isDarkMode ? 'bg-gray-800' : 'bg-gray-100';
     const cardBgColor = isDarkMode ? 'bg-gray-700' : 'bg-white';
@@ -25,9 +25,15 @@ const ProfileScreen = () => {
             <View className="p-6">
                 {/* Profile Card */}
                 <View className={`${cardBgColor} p-6 rounded-3xl shadow-sm items-center mb-6`}>
-                    <View className="w-24 h-24 rounded-full bg-purple-700 justify-center items-center mb-4">
-                        <Text className="text-white text-4xl font-bold">{getInitial(userName)}</Text>
-                    </View>
+                    {profileImage ? (
+                        <View className="w-24 h-24 rounded-full bg-purple-700 justify-center items-center mb-4 overflow-hidden">
+                            <Image source={{ uri: profileImage }} style={{ width: 96, height: 96, borderRadius: 48 }} />
+                        </View>
+                    ) : (
+                        <View className="w-24 h-24 rounded-full bg-purple-700 justify-center items-center mb-4">
+                            <Text className="text-white text-4xl font-bold">{getInitial(userName)}</Text>
+                        </View>
+                    )}
                     <Text className={`text-2xl font-bold ${textStyle}`}>{userName}</Text>
                     <Text className={`text-sm ${subtextStyle}`}>{userEmail}</Text>
                 </View>

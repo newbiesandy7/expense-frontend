@@ -97,6 +97,8 @@ function AppNavigation() {
     const { isLoggedIn } = useContext(AuthContext);
     const { isDarkMode } = useContext(ThemeContext); // Use ThemeContext here too for a complete example
 
+    // Lazy import to avoid circular dependency
+    const SetBudgetGoal = require('./src/screens/SetBudgetGoal').default;
     return (
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -104,6 +106,7 @@ function AppNavigation() {
                     <>
                         <Stack.Screen name="Main" component={MainTabs} />
                         <Stack.Screen name="Profile" component={ProfileScreen} />
+                        <Stack.Screen name="SetBudgetGoal" component={SetBudgetGoal} />
                     </>
                 ) : (
                     <Stack.Screen name="Auth" component={LoginScreen} />

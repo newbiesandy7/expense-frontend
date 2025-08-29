@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useContext } from 'react';
-import { Platform, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 
@@ -18,10 +18,9 @@ const CustomHeader = ({
 }) => {
     const navigation = useNavigation();
     const { isDarkMode } = useContext(ThemeContext);
-    const { authData } = useContext(AuthContext);
-
-    const userName = authData?.username || 'User';
-    const userInitial = userName.charAt(0).toUpperCase();
+    const { userName, profileImage } = useContext(AuthContext);
+    const displayName = userName || 'User';
+    const userInitial = displayName.charAt(0).toUpperCase();
 
     const gradientColors = isDarkMode ? ['#4B0082', '#6A0DAD'] : ['#8A2BE2', '#4B0082'];
     const headerContainerClass = isSmall ? 'pb-4' : 'pb-6';
@@ -56,9 +55,13 @@ const CustomHeader = ({
                         {showProfileIcon && (
                             <TouchableOpacity
                                 onPress={() => navigation.navigate('Profile')}
-                                className="w-10 h-10 rounded-full bg-white bg-opacity-30 justify-center items-center"
+                                className="w-10 h-10 rounded-full bg-white bg-opacity-30 justify-center items-center overflow-hidden"
                             >
-                                <Text className="text-white font-bold text-lg">{userInitial}</Text>
+                                {profileImage ? (
+                                    <Image source={{ uri: profileImage }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                                ) : (
+                                    <Text className="text-white font-bold text-lg">{userInitial}</Text>
+                                )}
                             </TouchableOpacity>
                         )}
                     </View>

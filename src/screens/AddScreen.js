@@ -142,6 +142,7 @@ const AddScreen = () => {
         }
     };
 
+    const navigation = useNavigation();
     return (
         <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
             <CustomHeader
@@ -270,7 +271,7 @@ const AddScreen = () => {
                 {/* Save Button */}
                 <TouchableOpacity
                     onPress={handleSave}
-                    className="w-full bg-purple-700 py-4 rounded-full items-center mb-6"
+                    className="w-full bg-purple-700 py-4 rounded-full items-center mb-4"
                     disabled={loading}
                 >
                     {loading ? (
@@ -279,6 +280,7 @@ const AddScreen = () => {
                         <Text className="text-white text-lg font-bold">Add {type}</Text>
                     )}
                 </TouchableOpacity>
+
             </ScrollView>
         </View>
     );

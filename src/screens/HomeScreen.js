@@ -156,6 +156,7 @@ const HomeScreen = () => {
         </View>
     );
 
+    const navigation = useNavigation();
     return (
         <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
             <CustomHeader
@@ -165,7 +166,17 @@ const HomeScreen = () => {
                 showTotalBalance={true}
                 totalBalance={`रू${totalBalance}`}
             />
-            
+
+            {/* Set Budget Goal Button */}
+            <View className="px-6 mt-4">
+                <TouchableOpacity
+                    className="w-full bg-blue-600 py-3 rounded-xl items-center mb-4"
+                    onPress={() => navigation.navigate('SetBudgetGoal')}
+                >
+                    <Text className="text-white font-bold text-lg">Set Budget Goal</Text>
+                </TouchableOpacity>
+            </View>
+
             {isLoading ? (
                 <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color={colors.primary} />
