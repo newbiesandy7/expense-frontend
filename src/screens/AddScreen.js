@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Header from '../components/Header';
+import CustomHeader from '../components/CustomHeader'; // Import the new header component
 import { ThemeContext } from '../context/ThemeContext';
 
 const paymentMethods = [
@@ -19,12 +19,13 @@ const AddScreen = () => {
     const [type, setType] = useState('Expense');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
-     const [date, setDate] = useState(new Date());
+    const [date, setDate] = useState(new Date());
     const [webDate, setWebDate] = useState(new Date().toISOString().split('T')[0]);
     const [category, setCategory] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [loading, setLoading] = useState(false);
     const [categoriesLoading, setCategoriesLoading] = useState(true);
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
     const [expenseCategories, setExpenseCategories] = useState([]);
     const [incomeCategories, setIncomeCategories] = useState([]);
@@ -44,7 +45,7 @@ const AddScreen = () => {
                 },
             });
             const data = await response.json();
-            // Ensure we always return an array
+            
             if (response.ok) {
                 if (Array.isArray(data)) {
                     return data;
@@ -66,7 +67,6 @@ const AddScreen = () => {
     useEffect(() => {
         const loadCategories = async () => {
             setCategoriesLoading(true);
-            // Calling the fetch function with the correct singular endpoint types
             const fetchedExpenseCats = await fetchCategories('expense');
             const fetchedIncomeCats = await fetchCategories('income');
             setExpenseCategories(fetchedExpenseCats);
@@ -75,16 +75,17 @@ const AddScreen = () => {
         };
         loadCategories();
     }, []);
-const onDateChange = (event, selectedDate) => {
-    const currentDate = selectedDate || date;
-    setShowDatePicker(Platform.OS === 'ios');
-    setDate(currentDate);
-};
 
-const handleWebDateChange = (e) => {
-    setWebDate(e.target.value);
-    setDate(new Date(e.target.value));
-};
+    const onDateChange = (event, selectedDate) => {
+        const currentDate = selectedDate || date;
+        setShowDatePicker(Platform.OS === 'ios');
+        setDate(currentDate);
+    };
+
+    const handleWebDateChange = (e) => {
+        setWebDate(e.target.value);
+        setDate(new Date(e.target.value));
+    };
 
     const handleSave = async () => {
         if (!amount || !category || !paymentMethod) {
@@ -104,10 +105,8 @@ const handleWebDateChange = (e) => {
 
         let endpoint = '';
         if (type === 'Expense') {
-            // Corrected URL to use singular 'expense'
             endpoint = 'http://127.0.0.1:8000/expense/';
         } else {
-            // Corrected URL to use singular 'income'
             endpoint = 'http://127.0.0.1:8000/income/';
         }
 
@@ -144,9 +143,13 @@ const handleWebDateChange = (e) => {
     };
 
     return (
-        <ScrollView className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-            <Header title="Add Transaction" showBackButton={false} showProfileIcon={false} />
-            <View className="p-6">
+        <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            <CustomHeader
+                title="Add Transaction"
+                isSmall={true}
+                showProfileIcon={true}
+            />
+            <ScrollView className="flex-1 px-6 pt-4">
                 {/* Type Selection */}
                 <View className={`rounded-xl p-1 mb-6 flex-row ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                     <TouchableOpacity
@@ -189,15 +192,15 @@ const handleWebDateChange = (e) => {
                             {Array.isArray(categories) && categories.map((item, index) => (
                                 <TouchableOpacity
                                     key={index}
-                                    className={`items-center mr-4 p-3 rounded-xl ${category?.name === item.name ? 'bg-purple-700' : (isDarkMode ? 'bg-gray-700' : 'bg-white')}`}
+                                    className={`items-center mr-4 p-3 rounded-xl ${category?.id === item.id ? 'bg-purple-700' : (isDarkMode ? 'bg-gray-700' : 'bg-white')}`}
                                     onPress={() => setCategory(item)}
                                 >
                                     <MaterialCommunityIcons
                                         name={item.icon}
                                         size={32}
-                                        color={category?.name === item.name ? '#FFF' : colors.primary}
+                                        color={category?.id === item.id ? '#FFF' : colors.primary}
                                     />
-                                    <Text className={`mt-1 font-semibold text-center ${category?.name === item.name ? 'text-white' : (isDarkMode ? 'text-white' : 'text-gray-900')}`}>
+                                    <Text className={`mt-1 font-semibold text-center ${category?.id === item.id ? 'text-white' : (isDarkMode ? 'text-white' : 'text-gray-900')}`}>
                                         {item.name}
                                     </Text>
                                 </TouchableOpacity>
@@ -207,39 +210,39 @@ const handleWebDateChange = (e) => {
                 </View>
 
                 {/* Other Inputs */}
-               <View className="space-y-4">
-    {Platform.OS === 'web' ? (
-        <TextInput
-            className={`p-4 rounded-xl text-lg ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
-            type="date"
-            value={webDate}
-            onChange={handleWebDateChange}
-        />
-    ) : (
-        <TouchableOpacity onPress={() => setShowDatePicker(true)} className={`flex-row items-center p-4 rounded-xl ${isDarkMode ? 'bg-gray-700' : 'bg-white'}`}>
-            <MaterialCommunityIcons name="calendar-month-outline" size={24} color={colors.primary} />
-            <Text className={`ml-3 text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{date.toDateString()}</Text>
-        </TouchableOpacity>
-    )}
+                <View className="space-y-4">
+                    {Platform.OS === 'web' ? (
+                        <TextInput
+                            className={`p-4 rounded-xl text-lg ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+                            type="date"
+                            value={webDate}
+                            onChange={handleWebDateChange}
+                        />
+                    ) : (
+                        <TouchableOpacity onPress={() => setShowDatePicker(true)} className={`flex-row items-center p-4 rounded-xl ${isDarkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                            <MaterialCommunityIcons name="calendar-month-outline" size={24} color={colors.primary} />
+                            <Text className={`ml-3 text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{date.toDateString()}</Text>
+                        </TouchableOpacity>
+                    )}
 
-    {Platform.OS !== 'web' && showDatePicker && (
-        <DateTimePicker
-            testID="dateTimePicker"
-            value={date}
-            mode="date"
-            display="default"
-            onChange={onDateChange}
-        />
-    )}
+                    {Platform.OS !== 'web' && showDatePicker && (
+                        <DateTimePicker
+                            testID="dateTimePicker"
+                            value={date}
+                            mode="date"
+                            display="default"
+                            onChange={onDateChange}
+                        />
+                    )}
 
-    <TextInput
-        className={`p-4 rounded-xl text-lg ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
-        placeholder="Description (optional)"
-        placeholderTextColor={isDarkMode ? '#9CA3AF' : '#6B7280'}
-        value={description}
-        onChangeText={setDescription}
-    />
-</View>
+                    <TextInput
+                        className={`p-4 rounded-xl text-lg ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+                        placeholder="Description (optional)"
+                        placeholderTextColor={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                        value={description}
+                        onChangeText={setDescription}
+                    />
+                </View>
 
                 {/* Payment Method Selection */}
                 <View className="mt-6 mb-6">
@@ -267,7 +270,7 @@ const handleWebDateChange = (e) => {
                 {/* Save Button */}
                 <TouchableOpacity
                     onPress={handleSave}
-                    className="w-full bg-purple-700 py-4 rounded-full items-center"
+                    className="w-full bg-purple-700 py-4 rounded-full items-center mb-6"
                     disabled={loading}
                 >
                     {loading ? (
@@ -276,8 +279,8 @@ const handleWebDateChange = (e) => {
                         <Text className="text-white text-lg font-bold">Add {type}</Text>
                     )}
                 </TouchableOpacity>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 };
 

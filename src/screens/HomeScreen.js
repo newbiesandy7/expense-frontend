@@ -1,175 +1,265 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Platform, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
-import Header from '../components/Header';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 
-const HomeScreen = () => {
-    const { isDarkMode, colors } = useContext(ThemeContext);
-    const { userName } = useContext(AuthContext);
-    const screenWidth = Dimensions.get("window").width;
+const screenWidth = Dimensions.get('window').width;
 
+// CustomHeader component (integrated for a single file solution)
+const CustomHeader = ({ 
+    title, 
+    subtitle,
+    showProfileIcon = false,
+    showTotalBalance = false,
+    totalBalance = 'रू0'
+}) => {
+    const navigation = useNavigation();
+    const { isDarkMode } = useContext(ThemeContext);
+    const { userName } = useContext(AuthContext);
+
+    const displayName = userName || 'User';
+    const userInitial = displayName.charAt(0).toUpperCase();
+
+    const gradientColors = isDarkMode ? ['#4B0082', '#6A0DAD'] : ['#8A2BE2', '#4B0082'];
+
+    return (
+        <LinearGradient
+            colors={gradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            className={`rounded-b-3xl shadow-lg z-20 pb-6 ${Platform.OS === 'android' ? 'pt-8' : ''}`}
+        >
+            <SafeAreaView>
+                <View className="flex-row justify-between items-center px-6">
+                    <View>
+                        <Text className="text-white text-lg font-medium opacity-80">{title}</Text>
+                        {subtitle && <Text className="text-white text-2xl font-bold mt-1">{subtitle}</Text>}
+                    </View>
+                    
+                    {showProfileIcon && (
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Profile')}
+                            className="w-10 h-10 rounded-full bg-white bg-opacity-30 justify-center items-center"
+                        >
+                            <Text className="text-white font-bold text-lg">{userInitial}</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {showTotalBalance && (
+                    <View className="mt-4 px-6">
+                        <Text className="text-white text-base opacity-80">Total Balance</Text>
+                        <Text className="text-white text-4xl font-bold mt-1">{totalBalance}</Text>
+                        <View className="flex-row items-center mt-2">
+                            <MaterialCommunityIcons name="trending-up" size={18} color="white" />
+                            <Text className="text-white ml-1 text-sm opacity-90">+12.5% from last month</Text>
+                        </View>
+                    </View>
+                )}
+            </SafeAreaView>
+        </LinearGradient>
+    );
+};
+
+const HomeScreen = () => {
+    const { colors, isDarkMode } = useContext(ThemeContext);
+    const { userName } = useContext(AuthContext);
+    const isFocused = useIsFocused();
     const [isLoading, setIsLoading] = useState(true);
-    const [financeData, setFinanceData] = useState({
-        totalBalance: '0',
-        income: '0',
-        expenses: '0',
-        dailyExpenses: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [{
-                data: [0, 0, 0, 0, 0, 0, 0]
-            }]
-        },
-        expenseBreakdown: [],
+    const [error, setError] = useState(null);
+
+    const [totalBalance, setTotalBalance] = useState('0');
+    const [incomeTotal, setIncomeTotal] = useState('0');
+    const [expensesTotal, setExpensesTotal] = useState('0');
+    const [expenseBreakdown, setExpenseBreakdown] = useState([]);
+    const [dailySpendingData, setDailySpendingData] = useState({
+        labels: [],
+        datasets: [{ data: [] }]
     });
 
-    const chartConfig = {
-        backgroundGradientFrom: colors.card,
-        backgroundGradientTo: colors.card,
-        color: (opacity = 1) => colors.primary,
-        barPercentage: 0.5,
-        fillShadowGradient: colors.primary,
-        fillShadowGradientOpacity: 1,
-        propsForBackgroundLines: {
-            strokeDasharray: "",
-            stroke: isDarkMode ? colors.subtext : colors.background,
-        },
-        decimalPlaces: 0,
-        labelColor: (opacity = 1) => isDarkMode ? colors.text : colors.subtext,
-    };
-
-    const fetchFinancialData = async () => {
+    const fetchDashboardData = async () => {
         setIsLoading(true);
-        const dataUrl = 'http://127.0.0.1:8000/expense/report/';
-        
+        setError(null);
         try {
             const accessToken = await AsyncStorage.getItem('access_token');
-            const response = await fetch(dataUrl, {
+            const response = await fetch('http://127.0.0.1:8000/expense/report/', {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
             });
-            const data = await response.json();
+            
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`API Error: ${response.status} - ${errorData}`);
+            }
 
-            if (response.ok) {
-                setFinanceData({
-                    totalBalance: `रू${data.total_balance}`,
-                    income: `रू${data.total_income}`,
-                    expenses: `रू${data.total_expenses}`,
-                    dailyExpenses: {
-                        labels: data.daily_expenses.map(item => item.day_of_week),
-                        datasets: [{
-                            data: data.daily_expenses.map(item => item.total_amount)
-                        }]
-                    },
-                    expenseBreakdown: data.expense_breakdown.map(item => ({
-                        name: item.category_name,
-                        amount: item.total_amount,
-                        color: item.color,
-                    })),
+            const data = await response.json();
+            console.log('Dashboard API response:', data); // Debug log
+
+            setTotalBalance(data?.total_balance ?? '0');
+            setIncomeTotal(data?.total_income ?? '0');
+            setExpensesTotal(data?.total_expenses ?? '0');
+            setExpenseBreakdown(
+                Array.isArray(data?.expense_breakdown)
+                    ? data.expense_breakdown.map(item => ({
+                        name: item.category_name ?? item.name ?? '',
+                        amount: item.total_amount ?? item.amount ?? 0,
+                        color: item.color ?? '#E5E7EB'
+                    }))
+                    : []
+            );
+
+            const dailyData = data?.daily_expenses;
+            if (Array.isArray(dailyData) && dailyData.length > 0) {
+                const labels = dailyData.map(item => item.day_of_week || item.date || '');
+                const spendingValues = dailyData.map(item => parseFloat(item.total_amount ?? item.amount) || 0);
+                setDailySpendingData({
+                    labels: labels,
+                    datasets: [{ data: spendingValues }]
                 });
             } else {
-                console.error("Failed to fetch data:", data.detail);
+                setDailySpendingData({
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                    datasets: [{ data: [0, 0, 0, 0, 0] }]
+                });
             }
-        } catch (error) {
-            console.error('Network error:', error);
+
+        } catch (err) {
+            setError(err.message);
+            console.error('Fetch Error:', err.message);
+            setDailySpendingData({
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                datasets: [{ data: [0, 0, 0, 0, 0] }]
+            });
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchFinancialData();
-    }, []);
+        if (isFocused) {
+            fetchDashboardData();
+        }
+    }, [isFocused]);
 
-    if (isLoading) {
-        return (
-            <View className={`flex-1 justify-center items-center ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text className={`mt-4 text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Loading financial data...</Text>
-            </View>
-        );
-    }
-
-    const { dailyExpenses, expenseBreakdown } = financeData;
-    const hasDailyData = dailyExpenses.datasets[0].data.some(d => d > 0);
-    const hasBreakdownData = expenseBreakdown.length > 0;
+    const renderExpenseItem = ({ item }) => (
+        <View className="flex-row items-center my-1 w-1/2">
+            <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color || '#E5E7EB' }} />
+            <Text className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>{item.name || 'N/A'}</Text>
+            <Text className={`font-semibold ml-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>रू{item.amount ?? 0}</Text>
+        </View>
+    );
 
     return (
-        <ScrollView className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-            <Header
-                title={`Hello, ${userName || 'User'}`}
-                subtitle="Welcome back!"
-                userName={userName}
+        <View className={`flex-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            <CustomHeader
+                title="Good Morning!"
+                subtitle={`Welcome back, ${userName || 'User'}`}
+                showProfileIcon={true}
+                showTotalBalance={true}
+                totalBalance={`रू${totalBalance}`}
             />
-            <View className="p-6">
-                <View className="bg-purple-700 rounded-3xl p-6 mb-6 shadow-md">
-                    <Text className="text-white text-base font-medium opacity-80">Total Balance</Text>
-                    <Text className="text-white text-4xl font-bold mt-1">{financeData.totalBalance}</Text>
-                    <View className="flex-row items-center mt-2">
-                        <MaterialCommunityIcons name="chart-line" size={16} color="white" />
-                        <Text className="text-white text-sm opacity-80 ml-1"> +12.5% from last month</Text>
-                    </View>
+            
+            {isLoading ? (
+                <View className="flex-1 justify-center items-center">
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text className={`mt-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Loading data...</Text>
                 </View>
-
-                <View className="flex-row justify-between mb-6">
-                    <View className={`${colors.card} rounded-2xl p-4 w-[48%] shadow-sm`}>
-                        <Text className="text-gray-500 font-medium">Income</Text>
-                        <View className="flex-row items-center justify-between mt-1">
-                            <Text className="text-lg font-bold text-green-600">{financeData.income}</Text>
-                            <MaterialCommunityIcons name="arrow-up-circle-outline" size={32} color="#10B981" />
+            ) : error ? (
+                <View className="flex-1 justify-center items-center">
+                    <Text className="text-red-500 text-base text-center">{error}</Text>
+                    <TouchableOpacity onPress={fetchDashboardData} className="mt-4 px-4 py-2 rounded-full bg-purple-500">
+                        <Text className="text-white font-semibold">Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <ScrollView 
+                    className="flex-1 px-6"
+                    contentContainerStyle={{
+                        paddingTop: 16 // Ensures content doesn't overlap the header
+                    }}
+                >
+                    {/* Income/Expenses Section */}
+                    <View className="flex-row justify-between mb-6">
+                        <View className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl flex-1 mr-2 shadow-sm flex-row items-center`}>
+                            <View className="flex-1">
+                                <Text className={`text-base font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Income</Text>
+                                <Text className={`text-xl font-bold mt-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>रू{incomeTotal}</Text>
+                            </View>
+                            <View className="w-10 h-10 rounded-full bg-green-200 justify-center items-center">
+                                <MaterialCommunityIcons name="arrow-top-right" size={24} color="green" />
+                            </View>
+                        </View>
+                        <View className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl flex-1 ml-2 shadow-sm flex-row items-center`}>
+                            <View className="flex-1">
+                                <Text className={`text-base font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Expenses</Text>
+                                <Text className={`text-xl font-bold mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>रू{expensesTotal}</Text>
+                            </View>
+                            <View className="w-10 h-10 rounded-full bg-red-200 justify-center items-center">
+                                <MaterialCommunityIcons name="arrow-bottom-left" size={24} color="red" />
+                            </View>
                         </View>
                     </View>
-                    <View className={`${colors.card} rounded-2xl p-4 w-[48%] shadow-sm`}>
-                        <Text className="text-gray-500 font-medium">Expenses</Text>
-                        <View className="flex-row items-center justify-between mt-1">
-                            <Text className="text-lg font-bold text-red-600">{financeData.expenses}</Text>
-                            <MaterialCommunityIcons name="arrow-down-circle-outline" size={32} color="#EF4444" />
+
+                    {/* Expense Analysis/Daily Spending */}
+                    <View className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl shadow-sm mb-6`}>
+                        <View className="flex-row items-center mb-4">
+                            <MaterialCommunityIcons name="chart-bar" size={24} color={isDarkMode ? '#D1D5DB' : '#6B7280'} />
+                            <Text className={`text-lg font-semibold ml-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Daily Spending</Text>
                         </View>
+                        {dailySpendingData.datasets[0].data.every(val => val === 0) ? (
+                            <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No daily spending data available</Text>
+                        ) : (
+                            <BarChart
+                                data={dailySpendingData}
+                                width={screenWidth - 48}
+                                height={220}
+                                yAxisLabel="रू"
+                                fromZero={true}
+                                showValuesOnTopOfBars={true}
+                                chartConfig={{
+                                    backgroundColor: isDarkMode ? '#1F2937' : '#ffffff',
+                                    backgroundGradientFrom: isDarkMode ? '#1F2937' : '#ffffff',
+                                    backgroundGradientTo: isDarkMode ? '#1F2937' : '#ffffff',
+                                    decimalPlaces: 0,
+                                    color: (opacity = 1) => `rgba(138, 43, 226, ${opacity})`,
+                                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                                    propsForBackgroundLines: {
+                                        strokeDasharray: '',
+                                        stroke: isDarkMode ? '#4B5563' : '#E5E7EB',
+                                    },
+                                    barPercentage: 0.7,
+                                }}
+                                style={{
+                                    borderRadius: 16
+                                }}
+                            />
+                        )}
                     </View>
-                </View>
 
-                {/* Bar Chart Section */}
-                <View className={`${colors.card} rounded-2xl p-6 shadow-sm mb-6`}>
-                    <Text className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-700'} mb-4`}>Daily Spending</Text>
-                    {hasDailyData ? (
-                        <BarChart
-                            style={{ borderRadius: 16 }}
-                            data={dailyExpenses}
-                            width={screenWidth - 48}
-                            height={220}
-                            yAxisLabel="रू"
-                            chartConfig={chartConfig}
-                            fromZero={true}
-                            showBarTops={false}
-                        />
-                    ) : (
-                        <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No daily spending data to display.</Text>
-                    )}
-                </View>
-
-                {/* Expense Breakdown Section */}
-                <View className={`${colors.card} rounded-2xl p-6 shadow-sm`}>
-                    <Text className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-700'} mb-4`}>Expense Breakdown</Text>
-                    {hasBreakdownData ? (
-                        <View className="flex-row flex-wrap">
-                            {expenseBreakdown.map((item, index) => (
-                                <View key={index} className="flex-row items-center w-1/2 mb-2">
-                                    <View style={{ backgroundColor: item.color }} className="w-2 h-2 rounded-full mr-2" />
-                                    <Text className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>{item.name} <Text className="font-bold">रू{item.amount}</Text></Text>
-                                </View>
-                            ))}
-                        </View>
-                    ) : (
-                        <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No expense data available.</Text>
-                    )}
-                </View>
-            </View>
-        </ScrollView>
+                    {/* Expense Breakdown */}
+                    <View className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl shadow-sm mb-6`}>
+                        <Text className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Expense Breakdown</Text>
+                        {Array.isArray(expenseBreakdown) && expenseBreakdown.length > 0 ? (
+                            <FlatList
+                                data={expenseBreakdown}
+                                renderItem={renderExpenseItem}
+                                keyExtractor={(item, idx) => item?.name ? item.name : idx.toString()}
+                                numColumns={2}
+                            />
+                        ) : (
+                            <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No expense breakdown data available</Text>
+                        )}
+                    </View>
+                </ScrollView>
+            )}
+        </View>
     );
 };
 
