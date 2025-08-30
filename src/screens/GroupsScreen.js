@@ -248,6 +248,12 @@ const GroupsScreen = () => {
         return;
     }
 
+    // Validate that selectedGroup has members and is properly defined
+    if (!selectedGroup || !selectedGroup.members || !Array.isArray(selectedGroup.members) || selectedGroup.members.length === 0) {
+      Alert.alert('Error', 'Selected group is invalid or has no members.');
+      return;
+    }
+
     let expensePayload = {
       description: expenseDescription,
       group: selectedGroup.id,
@@ -264,14 +270,29 @@ const GroupsScreen = () => {
       }
 
       expensePayload.amount = parsedTotalAmount;
-      const shareAmount = parsedTotalAmount / selectedGroup.members.length;
+      
+      // Fixed calculation - ensure we have valid members count
+      const membersCount = selectedGroup.members.length;
+      if (membersCount <= 0) {
+        Alert.alert('Error', 'Group must have at least one member.');
+        return;
+      }
+
+      const shareAmount = parsedTotalAmount / membersCount;
+      
+      // Validate shareAmount is positive
+      if (shareAmount <= 0) {
+        Alert.alert('Error', 'Share amount calculation resulted in invalid value.');
+        return;
+      }
+
       expensePayload.shares = selectedGroup.members.map(member => ({
         user: member.id,
-        amount_owed: shareAmount.toFixed(2),
+        amount_owed: parseFloat(shareAmount.toFixed(2)), // Convert back to number to avoid string issues
       }));
     }
 
-    if (splitType === 'unequal') {
+    if (splitType === 'manual') {
       const parsedTotalAmount = parseFloat(totalAmount);
       if (isNaN(parsedTotalAmount)) {
         Alert.alert('Error', 'Total amount must be a number.');
@@ -289,11 +310,11 @@ const GroupsScreen = () => {
         totalEnteredAmount += amount;
         shares.push({
           user: member.id,
-          amount_owed: amount.toFixed(2),
+          amount_owed: parseFloat(amount.toFixed(2)), // Convert to number
         });
       }
 
-      if (totalEnteredAmount.toFixed(2) !== parsedTotalAmount.toFixed(2)) {
+      if (Math.abs(totalEnteredAmount - parsedTotalAmount) > 0.01) { // Use small tolerance for floating point comparison
         Alert.alert('Error', `Individual amounts (${totalEnteredAmount.toFixed(2)}) do not add up to the total amount (${parsedTotalAmount.toFixed(2)}).`);
         return;
       }
@@ -304,8 +325,14 @@ const GroupsScreen = () => {
 
     if (splitType === 'itemized') {
       let totalItemizedAmount = 0;
-      let shares = [];
+      let sharesMap = {}; // Use map to accumulate shares per user
+
       for (const item of items) {
+        if (!item.item_name.trim()) {
+          Alert.alert('Error', 'Please enter a name for all items.');
+          return;
+        }
+
         const itemAmount = parseFloat(item.amount);
         if (isNaN(itemAmount) || itemAmount <= 0) {
           Alert.alert('Error', `Please enter a valid amount for item: "${item.item_name}"`);
@@ -321,16 +348,16 @@ const GroupsScreen = () => {
         const sharePerPerson = itemAmount / peopleOwed.length;
         totalItemizedAmount += itemAmount;
 
+        // Accumulate shares per user
         for (const userId of peopleOwed) {
-            shares.push({
-                user: userId,
-                amount_owed: sharePerPerson.toFixed(2),
-                item_name: item.item_name,
-            });
+            if (!sharesMap[userId]) {
+                sharesMap[userId] = 0;
+            }
+            sharesMap[userId] += sharePerPerson;
         }
       }
 
-      if (shares.length === 0) {
+      if (Object.keys(sharesMap).length === 0) {
         Alert.alert('Error', 'Please add and fill out at least one item.');
         return;
       }
@@ -341,12 +368,19 @@ const GroupsScreen = () => {
           return;
       }
 
+      // Convert shares map to array format expected by API
+      const shares = Object.keys(sharesMap).map(userId => ({
+          user: userId,
+          amount_owed: parseFloat(sharesMap[userId].toFixed(2)), // Convert to number
+      }));
+
       expensePayload.amount = parsedTotalAmount;
       expensePayload.shares = shares;
     }
 
     setIsAddingSharedExpense(true);
     const accessToken = await getAccessToken();
+    console.log('Expense Payload:', JSON.stringify(expensePayload, null, 2));
 
     try {
       const response = await fetch(`${API_BASE_URL}/expense/`, {
@@ -366,6 +400,7 @@ const GroupsScreen = () => {
         handleCloseAddExpenseModal();
         fetchGroups();
       } else {
+        console.error('API Error Response:', data);
         const errorDetail = data.detail || (typeof data === 'object' ? Object.values(data).flat().join('\n') : 'Failed to add shared expense.');
         Alert.alert('Error', errorDetail);
       }
@@ -569,10 +604,10 @@ const GroupsScreen = () => {
                                   <Text style={[styles.splitButtonText, splitType === 'equal' && styles.splitButtonTextActive]}>Equal</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
-                                  style={[styles.splitButton, splitType === 'unequal' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
-                                  onPress={() => setSplitType('unequal')}
+                                  style={[styles.splitButton, splitType === 'manual' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
+                                  onPress={() => setSplitType('manual')}
                               >
-                                  <Text style={[styles.splitButtonText, splitType === 'unequal' && styles.splitButtonTextActive]}>Unequal</Text>
+                                  <Text style={[styles.splitButtonText, splitType === 'manual' && styles.splitButtonTextActive]}>manual</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                   style={[styles.splitButton, splitType === 'itemized' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
@@ -583,8 +618,8 @@ const GroupsScreen = () => {
                           </View>
                       </View>
 
-                      {/* Unequal Split Inputs */}
-                      {splitType === 'unequal' && selectedGroup?.members && (
+                      {/* manual Split Inputs */}
+                      {splitType === 'manual' && selectedGroup?.members && (
                           <View style={styles.formGroup}>
                               <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Individual Amounts</Text>
                               {selectedGroup.members.map(member => (
