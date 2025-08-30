@@ -21,7 +21,6 @@ import { ThemeContext } from '../context/ThemeContext';
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
 const GroupsScreen = () => {
-  // Correctly destructuring the 'id' directly from AuthContext
   const { isLoggedIn, id } = useContext(AuthContext);
   const { colors, isDarkMode } = useContext(ThemeContext);
   const navigation = useNavigation();
@@ -38,6 +37,9 @@ const GroupsScreen = () => {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // State for category dropdown modal
+  const [categoryDropdownVisible, setCategoryDropdownVisible] = useState(false);
+
   // State for "Add Shared Expense" modal
   const [isAddExpenseModalVisible, setAddExpenseModalVisible] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -47,6 +49,11 @@ const GroupsScreen = () => {
   const [totalAmount, setTotalAmount] = useState('');
   const [individualAmounts, setIndividualAmounts] = useState({});
   const [isAddingSharedExpense, setIsAddingSharedExpense] = useState(false);
+  const [items, setItems] = useState([{ item_name: '', amount: '', owes: {} }]);
+
+  // New state for Categories
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   const searchDebounce = useRef(null);
 
@@ -96,6 +103,34 @@ const GroupsScreen = () => {
     }
   }, []);
 
+  const fetchCategories = useCallback(async () => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/expense/categories/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setCategories(data.results || data || []);
+        if (data.results && data.results.length > 0) {
+          setSelectedCategory(data.results[0].id);
+        }
+      } else {
+        Alert.alert('Error Fetching Categories', data.detail || 'Failed to fetch categories.');
+      }
+    } catch (error) {
+      console.error('Network error in fetchCategories:', error);
+      Alert.alert('Network Error', 'Could not connect to the server to fetch categories.');
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchGroups();
@@ -137,128 +172,202 @@ const GroupsScreen = () => {
     }
   };
 
-const handleCreateGroup = async () => {
-  console.log('Starting group creation process'); // ✅ log at the start
-  if (!newGroupName.trim()) {
-    Alert.alert('Invalid Name', 'Group name cannot be empty.');
-    return;
-  }
-  console.log('New group name:', newGroupName); // ✅ log after validation
-  // Check if the user is authenticated using the 'id'
-  if (!isLoggedIn || !id) {
-    console.log('Authentication Error', 'User not authenticated. Please log in again.');
-    Alert.alert('Authentication Error', 'User not authenticated. Please log in again.');
-    return;
-  }
-  console.log('Auth data:', id); // ✅ log auth data
-
-  setIsCreatingGroup(true);
-
-  const memberIds = [...new Set([...selectedMembers, id])];
-  const groupData = { name: newGroupName.trim(), member_ids: memberIds };
-  console.log('Creating group with data:', groupData); // ✅ log after defining it
-
-  const accessToken = await getAccessToken();
-  if (!accessToken) {
-    setIsCreatingGroup(false);
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/expense/groups/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(groupData),
-    });
-
-    let data;
-    try {
-      data = await response.json();
-    } catch (jsonError) {
-      console.error('Error parsing JSON:', jsonError);
-      data = null;
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
+      Alert.alert('Invalid Name', 'Group name cannot be empty.');
+      return;
     }
-
-    console.log('Create group response:', response.status, data);
-
-    if (response.status === 201) {
-      Alert.alert('Success', 'Group created successfully!');
-      handleCloseCreateModal();
-      fetchGroups();
-    } else {
-      let errorDetail = '';
-      if (data) {
-        if (typeof data === 'object') {
-          if (data.detail) {
-            errorDetail = data.detail;
-          } else {
-            errorDetail = Object.values(data).join('\n');
-          }
-        } else {
-          errorDetail = data.toString();
-        }
-      }
-      Alert.alert('Creation Failed', errorDetail || 'Failed to create group.');
-    }
-  } catch (error) {
-    console.error('Network error in handleCreateGroup:', error);
-    Alert.alert('Network Error', 'Could not connect to the server.');
-  } finally {
-    setIsCreatingGroup(false);
-  }
-};
-
-
-  // New function to handle adding shared expenses
-  const handleAddSharedExpense = async () => {
-    if (!expenseDescription.trim() || !totalAmount) {
-      Alert.alert('Error', 'Please fill in the description and total amount.');
+    if (!isLoggedIn || !id) {
+      Alert.alert('Authentication Error', 'User not authenticated. Please log in again.');
       return;
     }
 
-    let expenseData = {
-      group: selectedGroup.id,
+    setIsCreatingGroup(true);
+
+    const memberIds = [...new Set([...selectedMembers, id])];
+    const groupData = { name: newGroupName.trim(), member_ids: memberIds };
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setIsCreatingGroup(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/expense/groups/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(groupData),
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Error parsing JSON:', jsonError);
+        data = null;
+      }
+
+      if (response.status === 201) {
+        Alert.alert('Success', 'Group created successfully!');
+        handleCloseCreateModal();
+        fetchGroups();
+      } else {
+        let errorDetail = '';
+        if (data) {
+          if (typeof data === 'object') {
+            if (data.detail) {
+              errorDetail = data.detail;
+            } else {
+              errorDetail = Object.values(data).flat().join('\n');
+            }
+          } else {
+            errorDetail = data.toString();
+          }
+        }
+        Alert.alert('Creation Failed', errorDetail || 'Failed to create group.');
+      }
+    } catch (error) {
+      console.error('Network error in handleCreateGroup:', error);
+      Alert.alert('Network Error', 'Could not connect to the server.');
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
+
+  const handleAddSharedExpense = async () => {
+    if (!expenseDescription.trim()) {
+      Alert.alert('Error', 'Please enter an expense description.');
+      return;
+    }
+    if (!selectedCategory) {
+        Alert.alert('Error', 'Please select a category.');
+        return;
+    }
+
+    let expensePayload = {
       description: expenseDescription,
-      paid_by: expensePaidBy,
-      total_amount: parseFloat(totalAmount),
+      group: selectedGroup.id,
       split_type: splitType,
-      member_ids: selectedGroup.members.map(m => m.id), // Assuming all members are involved
+      category_id: selectedCategory,
+      shares: [],
     };
 
-    if (splitType === 'unequal') {
-      const individualAmountsValid = Object.values(individualAmounts).every(amount => !isNaN(parseFloat(amount)));
-      if (!individualAmountsValid) {
-        Alert.alert('Error', 'Please enter valid amounts for each member.');
+    if (splitType === 'equal') {
+      const parsedTotalAmount = parseFloat(totalAmount);
+      if (isNaN(parsedTotalAmount) || parsedTotalAmount <= 0) {
+        Alert.alert('Error', 'Total amount must be a number greater than zero.');
         return;
       }
-      expenseData.individual_amounts = individualAmounts;
+
+      expensePayload.amount = parsedTotalAmount;
+      const shareAmount = parsedTotalAmount / selectedGroup.members.length;
+      expensePayload.shares = selectedGroup.members.map(member => ({
+        user: member.id,
+        amount_owed: shareAmount.toFixed(2),
+      }));
+    }
+
+    if (splitType === 'unequal') {
+      const parsedTotalAmount = parseFloat(totalAmount);
+      if (isNaN(parsedTotalAmount)) {
+        Alert.alert('Error', 'Total amount must be a number.');
+        return;
+      }
+
+      let totalEnteredAmount = 0;
+      let shares = [];
+      for (const member of selectedGroup.members) {
+        const amount = parseFloat(individualAmounts[member.id]);
+        if (isNaN(amount) || amount < 0) {
+          Alert.alert('Error', `Please enter a valid amount for ${member.username}.`);
+          return;
+        }
+        totalEnteredAmount += amount;
+        shares.push({
+          user: member.id,
+          amount_owed: amount.toFixed(2),
+        });
+      }
+
+      if (totalEnteredAmount.toFixed(2) !== parsedTotalAmount.toFixed(2)) {
+        Alert.alert('Error', `Individual amounts (${totalEnteredAmount.toFixed(2)}) do not add up to the total amount (${parsedTotalAmount.toFixed(2)}).`);
+        return;
+      }
+
+      expensePayload.amount = parsedTotalAmount;
+      expensePayload.shares = shares;
+    }
+
+    if (splitType === 'itemized') {
+      let totalItemizedAmount = 0;
+      let shares = [];
+      for (const item of items) {
+        const itemAmount = parseFloat(item.amount);
+        if (isNaN(itemAmount) || itemAmount <= 0) {
+          Alert.alert('Error', `Please enter a valid amount for item: "${item.item_name}"`);
+          return;
+        }
+
+        const peopleOwed = Object.keys(item.owes).filter(userId => item.owes[userId]);
+        if (peopleOwed.length === 0) {
+            Alert.alert('Error', `Please select at least one person for item: "${item.item_name}"`);
+            return;
+        }
+
+        const sharePerPerson = itemAmount / peopleOwed.length;
+        totalItemizedAmount += itemAmount;
+
+        for (const userId of peopleOwed) {
+            shares.push({
+                user: userId,
+                amount_owed: sharePerPerson.toFixed(2),
+                item_name: item.item_name,
+            });
+        }
+      }
+
+      if (shares.length === 0) {
+        Alert.alert('Error', 'Please add and fill out at least one item.');
+        return;
+      }
+
+      const parsedTotalAmount = parseFloat(totalAmount);
+      if (isNaN(parsedTotalAmount)) {
+          Alert.alert('Error', 'Total amount must be a number.');
+          return;
+      }
+
+      expensePayload.amount = parsedTotalAmount;
+      expensePayload.shares = shares;
     }
 
     setIsAddingSharedExpense(true);
     const accessToken = await getAccessToken();
 
     try {
-      const response = await fetch(`${API_BASE_URL}/expense/groups/${selectedGroup.id}/add_shared_expense/`, {
+      const response = await fetch(`${API_BASE_URL}/expense/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(expenseData),
+        body: JSON.stringify(expensePayload),
       });
 
       const data = await response.json();
       setIsAddingSharedExpense(false);
 
       if (response.status === 201) {
-        Alert.alert('Success', 'Shared expense added!');
+        Alert.alert('Success', 'Shared expense added successfully!');
         handleCloseAddExpenseModal();
         fetchGroups();
       } else {
-        Alert.alert('Error', data.detail || 'Failed to add shared expense.');
+        const errorDetail = data.detail || (typeof data === 'object' ? Object.values(data).flat().join('\n') : 'Failed to add shared expense.');
+        Alert.alert('Error', errorDetail);
       }
     } catch (error) {
       setIsAddingSharedExpense(false);
@@ -266,7 +375,6 @@ const handleCreateGroup = async () => {
       Alert.alert('Error', 'Network error. Please try again.');
     }
   };
-
 
   // Modal handler functions
   const handleOpenCreateModal = () => {
@@ -286,6 +394,8 @@ const handleCreateGroup = async () => {
     setSelectedGroup(group);
     setAddExpenseModalVisible(true);
     setExpensePaidBy(id || '');
+    setItems([{ item_name: '', amount: '', owes: {} }]);
+    fetchCategories();
   };
 
   const handleCloseAddExpenseModal = () => {
@@ -295,6 +405,8 @@ const handleCreateGroup = async () => {
     setIndividualAmounts({});
     setSelectedGroup(null);
     setSplitType('equal');
+    setItems([{ item_name: '', amount: '', owes: {} }]);
+    setSelectedCategory(null);
   };
 
   const toggleMemberSelection = (memberId) => {
@@ -388,37 +500,52 @@ const handleCreateGroup = async () => {
                           />
                       </View>
 
-                      {/* Split Between section */}
+                      {/* Category Picker */}
                       <View style={styles.formGroup}>
-                          <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Split Between</Text>
-                          {selectedGroup?.members.map(member => (
-                              <View key={member.id} style={styles.checkboxContainer}>
-                                  <MaterialCommunityIcons name="check-box" size={24} color={colors.primary} />
-                                  <Text style={[styles.checkboxLabel, { color: isDarkMode ? '#FFFFFF' : '#111827' }]}>{member.username}</Text>
-                              </View>
-                          ))}
+                          <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Category</Text>
+                          {categories.length > 0 ? (
+                            <>
+                              <TouchableOpacity
+                                style={[styles.pickerContainer, { backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
+                                onPress={() => setCategoryDropdownVisible(true)}
+                              >
+                                <Text style={[styles.picker, { color: selectedCategory ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#6B7280' : '#9CA3AF') }]}> 
+                                  {selectedCategory ? categories.find(cat => cat.id === selectedCategory)?.name : 'Select a category'}
+                                </Text>
+                              </TouchableOpacity>
+                              <Modal
+                                visible={categoryDropdownVisible}
+                                transparent
+                                animationType="fade"
+                                onRequestClose={() => setCategoryDropdownVisible(false)}
+                              >
+                                <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} activeOpacity={1} onPressOut={() => setCategoryDropdownVisible(false)}>
+                                  <View style={{ margin: 40, backgroundColor: isDarkMode ? '#1F2937' : '#fff', borderRadius: 8, padding: 16, maxHeight: 350 }}>
+                                    <ScrollView>
+                                      {categories.map(cat => (
+                                        <TouchableOpacity
+                                          key={cat.id}
+                                          style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: isDarkMode ? '#374151' : '#E5E7EB' }}
+                                          onPress={() => {
+                                            setSelectedCategory(cat.id);
+                                            setCategoryDropdownVisible(false);
+                                          }}
+                                        >
+                                          <Text style={{ color: isDarkMode ? '#fff' : '#111827', fontSize: 16 }}>{cat.name}</Text>
+                                        </TouchableOpacity>
+                                      ))}
+                                    </ScrollView>
+                                  </View>
+                                </TouchableOpacity>
+                              </Modal>
+                            </>
+                          ) : (
+                            <Text style={[styles.emptyText, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>No categories found.</Text>
+                          )}
+
                       </View>
 
-                      {/* Split Type section */}
-                      <View style={styles.formGroup}>
-                          <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Split Type</Text>
-                          <View style={styles.splitTypeContainer}>
-                              <TouchableOpacity
-                                  style={[styles.splitButton, splitType === 'equal' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
-                                  onPress={() => setSplitType('equal')}
-                              >
-                                  <Text style={[styles.splitButtonText, splitType === 'equal' && styles.splitButtonTextActive]}>Equal Split</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                  style={[styles.splitButton, splitType === 'unequal' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
-                                  onPress={() => setSplitType('unequal')}
-                              >
-                                  <Text style={[styles.splitButtonText, splitType === 'unequal' && styles.splitButtonTextActive]}>Unequal Split</Text>
-                              </TouchableOpacity>
-                          </View>
-                      </View>
-
-                      {/* Total Amount Input */}
+                      {/* Total Amount Input - Visible for all splits */}
                       <View style={styles.formGroup}>
                           <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Total Amount</Text>
                           <TextInput
@@ -431,11 +558,36 @@ const handleCreateGroup = async () => {
                           />
                       </View>
 
-                      {/* Individual amounts for unequal split */}
-                      {splitType === 'unequal' && (
+                      {/* Split Type section */}
+                      <View style={styles.formGroup}>
+                          <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Split Type</Text>
+                          <View style={styles.splitTypeContainer}>
+                              <TouchableOpacity
+                                  style={[styles.splitButton, splitType === 'equal' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
+                                  onPress={() => setSplitType('equal')}
+                              >
+                                  <Text style={[styles.splitButtonText, splitType === 'equal' && styles.splitButtonTextActive]}>Equal</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                  style={[styles.splitButton, splitType === 'unequal' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
+                                  onPress={() => setSplitType('unequal')}
+                              >
+                                  <Text style={[styles.splitButtonText, splitType === 'unequal' && styles.splitButtonTextActive]}>Unequal</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                  style={[styles.splitButton, splitType === 'itemized' && styles.splitButtonActive, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}
+                                  onPress={() => setSplitType('itemized')}
+                              >
+                                  <Text style={[styles.splitButtonText, splitType === 'itemized' && styles.splitButtonTextActive]}>Itemized</Text>
+                              </TouchableOpacity>
+                          </View>
+                      </View>
+
+                      {/* Unequal Split Inputs */}
+                      {splitType === 'unequal' && selectedGroup?.members && (
                           <View style={styles.formGroup}>
                               <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Individual Amounts</Text>
-                              {selectedGroup?.members.map(member => (
+                              {selectedGroup.members.map(member => (
                                   <View key={member.id} style={styles.individualAmountInput}>
                                       <Text style={[styles.checkboxLabel, { color: isDarkMode ? '#FFFFFF' : '#111827', flex: 1 }]}>{member.username}</Text>
                                       <TextInput
@@ -449,6 +601,61 @@ const handleCreateGroup = async () => {
                                   </View>
                               ))}
                           </View>
+                      )}
+
+                      {/* Itemized Split Inputs */}
+                      {splitType === 'itemized' && selectedGroup?.members && (
+                        <View style={styles.formGroup}>
+                            <Text style={[styles.formLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Itemized Split</Text>
+                            {items.map((item, index) => (
+                                <View key={index} style={[styles.itemContainer, { borderColor: isDarkMode ? '#4B5563' : '#D1D5DB' }]}>
+                                    <TextInput
+                                        style={[styles.itemInput, { backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', color: isDarkMode ? '#FFFFFF' : '#111827' }]}
+                                        placeholder="Item Name"
+                                        placeholderTextColor={isDarkMode ? '#6B7280' : '#9CA3AF'}
+                                        value={item.item_name}
+                                        onChangeText={text => {
+                                            const newItems = [...items];
+                                            newItems[index].item_name = text;
+                                            setItems(newItems);
+                                        }}
+                                    />
+                                    <TextInput
+                                        style={[styles.amountInput, { backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', color: isDarkMode ? '#FFFFFF' : '#111827' }]}
+                                        placeholder="Amount"
+                                        placeholderTextColor={isDarkMode ? '#6B7280' : '#9CA3AF'}
+                                        keyboardType="numeric"
+                                        value={item.amount}
+                                        onChangeText={text => {
+                                            const newItems = [...items];
+                                            newItems[index].amount = text;
+                                            setItems(newItems);
+                                        }}
+                                    />
+                                    <View style={styles.owesContainer}>
+                                        <Text style={[styles.owesLabel, { color: isDarkMode ? '#9CA3AF' : '#4B5563' }]}>Owes:</Text>
+                                        {selectedGroup.members.map(member => (
+                                            <TouchableOpacity
+                                                key={member.id}
+                                                style={[styles.owesMember, item.owes[member.id] && styles.owesMemberActive]}
+                                                onPress={() => {
+                                                    const newItems = [...items];
+                                                    newItems[index].owes[member.id] = !newItems[index].owes[member.id];
+                                                    setItems(newItems);
+                                                }}
+                                            >
+                                                <Text style={[styles.owesMemberText, item.owes[member.id] && styles.owesMemberTextActive]}>
+                                                    {member.username.charAt(0)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            ))}
+                            <TouchableOpacity style={styles.addItemButton} onPress={() => setItems([...items, { item_name: '', amount: '', owes: {} }])}>
+                                <Text style={styles.addItemButtonText}>+ Add Item</Text>
+                            </TouchableOpacity>
+                        </View>
                       )}
                   </ScrollView>
 
@@ -506,7 +713,7 @@ const handleCreateGroup = async () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }]}>
             <Text style={[styles.modalTitle, { color: isDarkMode ? '#FFFFFF' : '#111827' }]}>Create New Group</Text>
-            
+
             <TextInput
               style={[styles.input, { backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', color: isDarkMode ? '#FFFFFF' : '#000000' }]}
               placeholder="Group Name"
@@ -579,7 +786,7 @@ const styles = StyleSheet.create({
   cancelButton: { backgroundColor: 'transparent' },
   buttonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
   cancelButtonText: { fontWeight: 'bold' },
-  
+
   // Styles for the new Shared Expense Modal
   sharedExpenseModalContainer: { width: '90%', padding: 24, borderRadius: 12, maxHeight: '80%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
@@ -597,6 +804,18 @@ const styles = StyleSheet.create({
   amountInput: { flex: 0.5, padding: 8, borderRadius: 6, fontSize: 16, textAlign: 'right' },
   addButton: { width: '100%', paddingVertical: 14, borderRadius: 50, alignItems: 'center', marginTop: 16, backgroundColor: '#7C3AED' },
   addButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  itemContainer: { marginBottom: 16, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#ccc' },
+  itemInput: { flex: 1, padding: 10, marginBottom: 8, borderRadius: 6 },
+  owesContainer: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 8 },
+  owesLabel: { marginRight: 8, fontSize: 14 },
+  owesMember: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  owesMemberActive: { backgroundColor: '#7C3AED' },
+  owesMemberText: { color: '#000', fontWeight: 'bold' },
+  owesMemberTextActive: { color: '#FFFFFF' },
+  addItemButton: { padding: 12, borderWidth: 1, borderColor: '#7C3AED', borderRadius: 8, alignItems: 'center', marginTop: 8 },
+  addItemButtonText: { color: '#7C3AED', fontWeight: 'bold' },
+  pickerContainer: { borderWidth: 1, borderRadius: 8, overflow: 'hidden', marginBottom: 16 },
+  picker: { width: '100%', height: 50 },
 });
 
 export default GroupsScreen;
