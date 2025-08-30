@@ -4,7 +4,7 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Platform, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { BarChart } from 'react-native-chart-kit';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 
@@ -312,6 +312,36 @@ const HomeScreen = () => {
                             />
                         ) : (
                             <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No daily spending data available</Text>
+                        )}
+                    </View>
+
+                    {/* Pie Chart for Expense Breakdown */}
+                    <View className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} p-4 rounded-xl shadow-sm mb-6`}>
+                        <View className="flex-row items-center mb-4">
+                            <MaterialCommunityIcons name="chart-pie" size={24} color={isDarkMode ? '#D1D5DB' : '#6B7280'} />
+                            <Text className={`text-lg font-semibold ml-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Expense Breakdown</Text>
+                        </View>
+                        {Array.isArray(expenseBreakdown) && expenseBreakdown.length > 0 ? (
+                            <PieChart
+                                data={expenseBreakdown.map(item => ({
+                                    name: item.name,
+                                    amount: item.amount,
+                                    color: item.color || '#A78BFA',
+                                    legendFontColor: isDarkMode ? '#F3F4F6' : '#1E293B',
+                                    legendFontSize: 12
+                                }))}
+                                width={screenWidth - 48}
+                                height={180}
+                                chartConfig={{
+                                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+                                }}
+                                accessor="amount"
+                                backgroundColor="transparent"
+                                paddingLeft={"15"}
+                                absolute
+                            />
+                        ) : (
+                            <Text className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No expense breakdown data available</Text>
                         )}
                     </View>
 
