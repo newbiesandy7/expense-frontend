@@ -59,8 +59,9 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     setLoading(true);
+    
     try {
-  const response = await fetch(`http://127.0.0.1:8000/auth/login/`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,34 +69,54 @@ const LoginScreen = () => {
         body: JSON.stringify({ username: loginEmail, password: loginPassword }),
       });
 
+      // Handle non-JSON responses gracefully
+      if (!response.ok) {
+        let errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        try {
+          // Attempt to parse JSON even on an error, as the API might send JSON errors
+          const errorData = await response.json();
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            errorMessage = errorData.errors.map(e => e.detail || JSON.stringify(e)).join('\n');
+          } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+          }
+        } catch (jsonError) {
+            // This is the key change! If JSON parsing fails, the response was plain text.
+            const plainTextError = await response.text();
+            errorMessage = `Login failed: Server response was not valid JSON. Response text: "${plainTextError}"`;
+        }
+        Alert.alert('Login failed', errorMessage);
+        setLoading(false);
+        return;
+      }
+
       const data = await response.json();
       setLoading(false);
 
-      if (response.ok) {
+      if (data.details) {
+        console.log('Login successful, user data:', data);
         login(
           data.access,
-          data.username || loginEmail,
-          data.email || '',
-          data.profile_image || null
+          data.details.username || loginEmail,
+          data.details.email || '',
+          data.details.image || null,
+          data.details.id
         );
         if (data.refresh) {
           await AsyncStorage.setItem('refresh_token', data.refresh);
         }
         Alert.alert('Success', 'You are logged in!');
       } else {
-        let errorMessage = data.detail || 'Login failed';
-        if (data.errors && Array.isArray(data.errors)) {
-          errorMessage = data.errors.map(e => e.detail || JSON.stringify(e)).join('\n');
-        }
-        Alert.alert('Error', errorMessage);
-        console.log('Login failed:', data);
+        // Handle cases where login succeeds but the details object is missing
+        Alert.alert('Error', 'Login failed: Incomplete user data received.');
+        console.log('Login failed: Incomplete data received', data);
       }
     } catch (error) {
       setLoading(false);
       console.error('Network error:', error);
       Alert.alert(
         'Error',
-        'Network error. Make sure your server is running and accessible.'
+        'Network error. Please check your internet connection or if the server is running.'
       );
     }
   };
@@ -127,7 +148,7 @@ const LoginScreen = () => {
         formData.append('profile_image', { uri: signupProfileImage, name: filename, type });
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/auth/register/`, {
+      const response = await fetch(`${API_BASE_URL}/auth/register/`, {
         method: 'POST',
         // Do NOT set Content-Type header for FormData; let fetch set it automatically
         body: formData,

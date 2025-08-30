@@ -21,7 +21,8 @@ import { ThemeContext } from '../context/ThemeContext';
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
 const GroupsScreen = () => {
-  const { authData } = useContext(AuthContext);
+  // Correctly destructuring the 'id' directly from AuthContext
+  const { isLoggedIn, id } = useContext(AuthContext);
   const { colors, isDarkMode } = useContext(ThemeContext);
   const navigation = useNavigation();
 
@@ -41,7 +42,7 @@ const GroupsScreen = () => {
   const [isAddExpenseModalVisible, setAddExpenseModalVisible] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [expenseDescription, setExpenseDescription] = useState('');
-  const [expensePaidBy, setExpensePaidBy] = useState(authData?.id || '');
+  const [expensePaidBy, setExpensePaidBy] = useState(id || '');
   const [splitType, setSplitType] = useState('equal');
   const [totalAmount, setTotalAmount] = useState('');
   const [individualAmounts, setIndividualAmounts] = useState({});
@@ -136,46 +137,80 @@ const GroupsScreen = () => {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) {
-      Alert.alert('Invalid Name', 'Group name cannot be empty.');
-      return;
-    }
-    if (!authData || !authData.id) {
-      Alert.alert('Authentication Error', 'User not authenticated. Please log in again.');
-      return;
-    }
-    setIsCreatingGroup(true);
-    const memberIds = [...new Set([...selectedMembers, authData.id])];
-    const groupData = { name: newGroupName.trim(), member_ids: memberIds };
-    const accessToken = await getAccessToken();
-    if (!accessToken) { setIsCreatingGroup(false); return; }
+const handleCreateGroup = async () => {
+  console.log('Starting group creation process'); // ✅ log at the start
+  if (!newGroupName.trim()) {
+    Alert.alert('Invalid Name', 'Group name cannot be empty.');
+    return;
+  }
+  console.log('New group name:', newGroupName); // ✅ log after validation
+  // Check if the user is authenticated using the 'id'
+  if (!isLoggedIn || !id) {
+    console.log('Authentication Error', 'User not authenticated. Please log in again.');
+    Alert.alert('Authentication Error', 'User not authenticated. Please log in again.');
+    return;
+  }
+  console.log('Auth data:', id); // ✅ log auth data
 
+  setIsCreatingGroup(true);
+
+  const memberIds = [...new Set([...selectedMembers, id])];
+  const groupData = { name: newGroupName.trim(), member_ids: memberIds };
+  console.log('Creating group with data:', groupData); // ✅ log after defining it
+
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    setIsCreatingGroup(false);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/expense/groups/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(groupData),
+    });
+
+    let data;
     try {
-      const response = await fetch(`${API_BASE_URL}/expense/groups/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(groupData),
-      });
-      const data = await response.json();
-      if (response.status === 201) {
-        Alert.alert('Success', 'Group created successfully!');
-        handleCloseCreateModal();
-        fetchGroups();
-      } else {
-        const errorDetail = Object.values(data).join('\n');
-        Alert.alert('Creation Failed', errorDetail || 'Failed to create group.');
-      }
-    } catch (error) {
-      console.error('Network error in handleCreateGroup:', error);
-      Alert.alert('Network Error', 'Could not connect to the server.');
-    } finally {
-      setIsCreatingGroup(false);
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Error parsing JSON:', jsonError);
+      data = null;
     }
-  };
+
+    console.log('Create group response:', response.status, data);
+
+    if (response.status === 201) {
+      Alert.alert('Success', 'Group created successfully!');
+      handleCloseCreateModal();
+      fetchGroups();
+    } else {
+      let errorDetail = '';
+      if (data) {
+        if (typeof data === 'object') {
+          if (data.detail) {
+            errorDetail = data.detail;
+          } else {
+            errorDetail = Object.values(data).join('\n');
+          }
+        } else {
+          errorDetail = data.toString();
+        }
+      }
+      Alert.alert('Creation Failed', errorDetail || 'Failed to create group.');
+    }
+  } catch (error) {
+    console.error('Network error in handleCreateGroup:', error);
+    Alert.alert('Network Error', 'Could not connect to the server.');
+  } finally {
+    setIsCreatingGroup(false);
+  }
+};
+
 
   // New function to handle adding shared expenses
   const handleAddSharedExpense = async () => {
@@ -250,7 +285,7 @@ const GroupsScreen = () => {
   const handleOpenAddExpenseModal = (group) => {
     setSelectedGroup(group);
     setAddExpenseModalVisible(true);
-    setExpensePaidBy(authData?.id || '');
+    setExpensePaidBy(id || '');
   };
 
   const handleCloseAddExpenseModal = () => {
@@ -304,7 +339,7 @@ const GroupsScreen = () => {
   );
 
   const renderMemberItem = (member) => {
-    if (member.id === authData?.id) { return null; }
+    if (member.id === id) { return null; }
     const isSelected = selectedMembers.includes(member.id);
     return (
       <TouchableOpacity
