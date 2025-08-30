@@ -17,7 +17,6 @@ const HistoryScreen = () => {
     const [filters, setFilters] = useState({ startDate: null, endDate: null, type: 'All' });
 
     const categories = ['All', 'Food', 'Transport', 'Entertainment', 'Bills', 'Shopping', 'Other'];
-
     const fetchTransactions = async () => {
         setIsLoading(true);
         setError(null);
